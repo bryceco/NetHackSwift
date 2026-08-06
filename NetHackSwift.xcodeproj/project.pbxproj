@@ -6,8 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		02B20D52302547EB00C01E3E /* libnh.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 02B20D51302547EB00C01E3E /* libnh.a */; };
+		02F5766330254F8800F06F02 /* NetHackSwiftLib in Frameworks */ = {isa = PBXBuildFile; productRef = 02F5766230254F8800F06F02 /* NetHackSwiftLib */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		0211635E30251D5100E0FC96 /* NetHackSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NetHackSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		02B20D51302547EB00C01E3E /* libnh.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libnh.a; path = ../NetHack/src/libnh.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +29,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02B20D52302547EB00C01E3E /* libnh.a in Frameworks */,
+				02F5766330254F8800F06F02 /* NetHackSwiftLib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +41,7 @@
 			isa = PBXGroup;
 			children = (
 				0211636030251D5100E0FC96 /* NetHackSwift */,
+				02D2DB343025420E00CB39E5 /* Frameworks */,
 				0211635F30251D5100E0FC96 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -43,6 +52,14 @@
 				0211635E30251D5100E0FC96 /* NetHackSwift.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		02D2DB343025420E00CB39E5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				02B20D51302547EB00C01E3E /* libnh.a */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,6 +82,8 @@
 			);
 			name = NetHackSwift;
 			packageProductDependencies = (
+				0211637D3025376F00E0FC96 /* SwiftLibNethack */,
+				02F5766230254F8800F06F02 /* NetHackSwiftLib */,
 			);
 			productName = NetHackSwift;
 			productReference = 0211635E30251D5100E0FC96 /* NetHackSwift.app */;
@@ -94,6 +113,9 @@
 			);
 			mainGroup = 0211635530251D5100E0FC96;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				02F5766130254F8800F06F02 /* XCLocalSwiftPackageReference "../NetHackSwiftLib" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0211635F30251D5100E0FC96 /* Products */;
 			projectDirPath = "";
@@ -264,6 +286,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../NetHack/src";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Bryceco.NetHackSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -296,6 +319,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../NetHack/src";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Bryceco.NetHackSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -331,6 +355,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		02F5766130254F8800F06F02 /* XCLocalSwiftPackageReference "../NetHackSwiftLib" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../NetHackSwiftLib;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0211637D3025376F00E0FC96 /* SwiftLibNethack */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SwiftLibNethack;
+		};
+		02F5766230254F8800F06F02 /* NetHackSwiftLib */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NetHackSwiftLib;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0211635630251D5100E0FC96 /* Project object */;
 }
