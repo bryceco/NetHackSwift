@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct NetHackSwiftApp: App {
+    @State private var gameState = GameState()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainWindowView()
+                .environment(gameState)
         }
     }
 }
