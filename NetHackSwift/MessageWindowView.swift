@@ -1,0 +1,51 @@
+import SwiftUI
+
+struct MessageWindowView: View {
+    let text: String
+    var onClose: () -> Void
+
+    private var maxTextHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 800) * 0.6
+    }
+
+    // Extracted so ViewThatFits can use the same content in both branches.
+    private var textContent: some View {
+        Text(text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            // Sizes to text naturally; scrolls only when text exceeds maxTextHeight.
+            ViewThatFits(in: .vertical) {
+                textContent
+                ScrollView { textContent }
+                    .frame(maxHeight: maxTextHeight)
+            }
+
+            Button("Close", action: onClose)
+                .keyboardShortcut(.escape, modifiers: [])
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 21)
+                .padding(.bottom, 19)
+                .padding(.trailing, 21)
+        }
+        .frame(minWidth: 259)
+    }
+}
+
+#Preview("Short text") {
+    MessageWindowView(
+        text: "You feel a strange sensation as you advance to level 10!",
+        onClose: { }
+    )
+}
+
+#Preview("Long text") {
+    MessageWindowView(
+        text: String(repeating: "You feel a strange sensation. ", count: 40),
+        onClose: { }
+    )
+}

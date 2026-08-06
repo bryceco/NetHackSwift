@@ -32,7 +32,9 @@ struct MainWindowView: View {
     state.int_ = 18; state.wis = 18; state.cha = 18
     state.turn = 9999999
     state.statusEffects = "Confused, Stunned, Hallucinating"
-    state.messages = ["You hit the goblin.", "The goblin bites!", "You feel hungry."]
+    state.messages = ["You hit the goblin.",
+					  "The goblin bites!",
+					  "You feel hungry."]
     return MainWindowView()
         .environment(state)
 }
