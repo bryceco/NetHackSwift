@@ -9,16 +9,36 @@
 /* Begin PBXBuildFile section */
 		02B20D52302547EB00C01E3E /* libnh.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 02B20D51302547EB00C01E3E /* libnh.a */; };
 		02F5766330254F8800F06F02 /* NetHackSwiftLib in Frameworks */ = {isa = PBXBuildFile; productRef = 02F5766230254F8800F06F02 /* NetHackSwiftLib */; };
+		02F578A53026652400F06F02 /* Playground in Resources */ = {isa = PBXBuildFile; fileRef = 02F578A43026652400F06F02 /* Playground */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0211635E30251D5100E0FC96 /* NetHackSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NetHackSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		02B20D51302547EB00C01E3E /* libnh.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libnh.a; path = ../NetHack/src/libnh.a; sourceTree = "<group>"; };
+		02F578A43026652400F06F02 /* Playground */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Playground; path = NetHackSwift/Playground; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		02F576A23026608900F06F02 /* Exceptions for "NetHackSwift" folder in "NetHackSwift" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Playground/livelog,
+				Playground/logfile,
+				Playground/perm,
+				Playground/record,
+				Playground/sysconf,
+				Playground/xlogfile,
+			);
+			target = 0211635D30251D5100E0FC96 /* NetHackSwift */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0211636030251D5100E0FC96 /* NetHackSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				02F576A23026608900F06F02 /* Exceptions for "NetHackSwift" folder in "NetHackSwift" target */,
+			);
 			path = NetHackSwift;
 			sourceTree = "<group>";
 		};
@@ -40,6 +60,7 @@
 		0211635530251D5100E0FC96 = {
 			isa = PBXGroup;
 			children = (
+				02F578A43026652400F06F02 /* Playground */,
 				0211636030251D5100E0FC96 /* NetHackSwift */,
 				02D2DB343025420E00CB39E5 /* Frameworks */,
 				0211635F30251D5100E0FC96 /* Products */,
@@ -131,6 +152,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02F578A53026652400F06F02 /* Playground in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

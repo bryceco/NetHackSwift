@@ -22,11 +22,32 @@ import NetHackBridge
 
     private let bridge = NetHackBridge()
 
-    func start(dataPath: String) {
-		let currentDir = FileManager.default.currentDirectoryPath
-		setenv("NETHACKDIR", currentDir, 0)
+	func copyTo(playgroundURL: URL, from fromURL: URL) {
+		let fm = FileManager.default
+		let items = try! fm.contentsOfDirectory(at: fromURL,
+												includingPropertiesForKeys: nil,
+												options: [.skipsHiddenFiles])
+		for item in items {
+			let dest = playgroundURL.appendingPathComponent(item.lastPathComponent)
+			guard
+				!fm.fileExists(atPath: dest.path)
+			else {
+				continue
+			}
+			try! fm.copyItem(at: item, to: dest)
+		}
+	}
+
+    func start(playgroundURL: URL, resourcesURL: URL) {
+		// Copy default playground
+		let fm = FileManager.default
+
+		copyTo(playgroundURL: playgroundURL, from: resourcesURL.appendingPathComponent("Playground"))
+
+		fm.changeCurrentDirectoryPath(playgroundURL.path)
+
         bridge.delegate = self
-        bridge.run(withArguments: ["-d", dataPath]) { [weak self] exitCode in
+		bridge.run(withArguments: ["-d", playgroundURL.path]) { [weak self] exitCode in
             self?.outputLines.append("--- NetHack exited (\(exitCode)) ---")
         }
     }

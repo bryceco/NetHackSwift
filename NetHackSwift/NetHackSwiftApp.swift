@@ -18,10 +18,17 @@ struct NetHackSwiftApp: App {
 				.environment(gameState)
 				.environment(controller)
 				.onAppear {
-					// Point to NetHack's data files inside the app bundle
-					if let dataPath = Bundle.main.resourcePath {
-						controller.start(dataPath: dataPath)
-					}
+					let resourcesURL = Bundle.main.resourceURL!
+					let appSupport = FileManager.default
+						.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+					let playgroundURL = appSupport.appendingPathComponent("NetHack", isDirectory: true)
+					#if true
+					try! FileManager.default.removeItem(at: playgroundURL)
+					#endif
+					try? FileManager.default.createDirectory(at: playgroundURL,
+						withIntermediateDirectories: true)
+					controller.start(playgroundURL: playgroundURL,
+					                 resourcesURL: resourcesURL)
 				}
         }
     }
