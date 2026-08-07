@@ -23,6 +23,8 @@ import NetHackBridge
     private let bridge = NetHackBridge()
 
     func start(dataPath: String) {
+		let currentDir = FileManager.default.currentDirectoryPath
+		setenv("NETHACKDIR", currentDir, 0)
         bridge.delegate = self
         bridge.run(withArguments: ["-d", dataPath]) { [weak self] exitCode in
             self?.outputLines.append("--- NetHack exited (\(exitCode)) ---")
