@@ -122,7 +122,7 @@ struct MenuWindowView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(selectedIDs.isEmpty)
                 } else {
-                    Button("Close") { onAccept(allItems) }
+                    Button("Close") { onAccept(selectedItems) }
                         .keyboardShortcut(.return, modifiers: [])
                         .buttonStyle(.borderedProminent)
                 }

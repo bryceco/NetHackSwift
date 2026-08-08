@@ -2,22 +2,28 @@ import SwiftUI
 
 struct MainWindowView: View {
     @Environment(GameState.self) private var state
+    @Environment(NetHackController.self) private var controller
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                StatsView()
-                    .frame(width: 366, height: 160)
-                EquipmentView()
-                    .frame(width: 118, height: 160)
-                MessagesView(messages: state.messages)
-                    .frame(minWidth: 153, maxWidth: .infinity)
-                    .frame(height: 160)
+        if controller.isInitialized {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    StatsView()
+                        .frame(width: 366, height: 160)
+                    EquipmentView()
+                        .frame(width: 118, height: 160)
+                    MessagesView(messages: state.messages)
+                        .frame(minWidth: 153, maxWidth: .infinity)
+                        .frame(height: 160)
+                }
+                MapView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            MapView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 637, maxWidth: .infinity, minHeight: 376, maxHeight: .infinity)
+        } else {
+            ProgressView()
+                .frame(minWidth: 637, minHeight: 376)
         }
-        .frame(minWidth: 637, maxWidth: .infinity, minHeight: 376, maxHeight: .infinity)
     }
 }
 
@@ -35,8 +41,11 @@ struct MainWindowView: View {
     state.turn = 9999999
     state.statusEffects = "Confused, Stunned, Hallucinating"
     state.messages = ["You hit the goblin.",
-					  "The goblin bites!",
-					  "You feel hungry."]
+                      "The goblin bites!",
+                      "You feel hungry."]
+    let controller = NetHackController()
+    controller.isInitialized = true
     return MainWindowView()
         .environment(state)
+        .environment(controller)
 }

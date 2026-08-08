@@ -52,24 +52,24 @@ private struct NHMenuItem {
 @Observable final class NetHackController: NSObject {
 
     // At most one of these is non-nil at a time.
-    // The completion stored here is called (on the main thread) to provide
-    // the return value and unblock the NetHack thread.
-    private var pendingKeyContinuation: CheckedContinuation<Int32, Never>?
-    private var pendingKeyOrMouseContinuation: CheckedContinuation<(key: Int32, x: Int32, y: Int32, mod: Int32), Never>?
-    private var pendingLineContinuation: CheckedContinuation<String?, Never>?
-    private var pendingMenuContinuation: CheckedContinuation<[NHMenuSelection]?, Never>?
+    // The completion stored here is called on the main thread to provide
+    // the input value and unblock the NetHack thread.
+    @ObservationIgnored private var pendingKeyCompletion: ((Int32) -> Void)?
+    @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
+    @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
 
     /// Windows created by NetHack but not yet displayed (between createNhwindow and displayNhwindow).
-    private var pendingWindows: [NHWindowID: NHWindowData] = [:]
+    @ObservationIgnored private var pendingWindows: [NHWindowID: NHWindowData] = [:]
 
     /// NSWindows opened on behalf of NetHack, keyed by their NHWindowID.
     /// Kept to maintain a strong reference so the windows aren't deallocated.
-    private var nhWindows: [NHWindowID: NSWindow] = [:]
+    @ObservationIgnored private var nhWindows: [NHWindowID: NSWindow] = [:]
 
     private let bridge = NetHackBridge()
+    var isInitialized = false
 
 	private func copyTo(playgroundURL: URL, from fromURL: URL) {
 		let fm = FileManager.default
@@ -95,27 +95,27 @@ private struct NHMenuItem {
 
     /// Forward a keypress to whichever blocking key-input request is pending.
     func sendKey(_ key: Int32) {
-        if let cont = pendingKeyContinuation {
-            pendingKeyContinuation = nil
-            cont.resume(returning: key)
-        } else if let cont = pendingKeyOrMouseContinuation {
-            pendingKeyOrMouseContinuation = nil
-            cont.resume(returning: (key: key, x: 0, y: 0, mod: 0))
+        if let completion = pendingKeyCompletion {
+            pendingKeyCompletion = nil
+            completion(key)
+        } else if let completion = pendingKeyOrMouseCompletion {
+            pendingKeyOrMouseCompletion = nil
+            completion(key, 0, 0, 0)
         }
     }
 
     /// Forward a mouse click to a pending nh_poskey request.
     func sendMouseClick(x: Int32, y: Int32, mod: Int32) {
-        guard let cont = pendingKeyOrMouseContinuation else { return }
-        pendingKeyOrMouseContinuation = nil
-        cont.resume(returning: (key: 0, x: x, y: y, mod: mod))
+        guard let completion = pendingKeyOrMouseCompletion else { return }
+        pendingKeyOrMouseCompletion = nil
+        completion(0, x, y, mod)
     }
 
     /// Forward a line of text to a pending getlin request. Pass nil to cancel.
     func sendLine(_ line: String?) {
-        guard let cont = pendingLineContinuation else { return }
-        pendingLineContinuation = nil
-        cont.resume(returning: line)
+        guard let completion = pendingLineCompletion else { return }
+        pendingLineCompletion = nil
+        completion(line)
     }
 }
 
@@ -176,52 +176,26 @@ extension NetHackController: NetHackBridgeDelegate {
                 defer: false
             )
             if hasTitle { panel.title = data.menuTitle }
+            panel.animationBehavior = .none
+            panel.isRestorable = false
+            panel.isReleasedWhenClosed = false
             panel.isMovableByWindowBackground = true
             nhWindows[window] = panel
-            let view = MessageWindowView(text: text) { [weak self, weak panel] in
-                if blocking { NSApp.stopModal() }
-                panel?.close()
-                self?.nhWindows.removeValue(forKey: window)
-            }
+            let view = MessageWindowView(text: text) { NSApp.stopModal() }
             panel.contentViewController = NSHostingController(rootView: view)
             if blocking {
                 NSApp.runModal(for: panel)
+                panel.close()
+                nhWindows.removeValue(forKey: window)
             } else {
-                panel.makeKeyAndOrderFront(nil)
+                panel.orderFront(nil)
             }
         case .menu:
-            let items = data.menuItems.map { item in
-                MenuItemData(
-                    key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
-                    text: item.string,
-                    identifier: item.identifier
-                )
-            }
-            let categories = [MenuCategory(title: data.menuTitle, items: items)]
-            let nsWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 250, height: 100),
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            nhWindows[window] = nsWindow
-            let dismiss: () -> Void = { [weak self, weak nsWindow] in
-                if blocking { NSApp.stopModal() }
-                nsWindow?.close()
-                self?.nhWindows.removeValue(forKey: window)
-            }
-            let view = MenuWindowView(
-                categories: categories,
-                isSelectable: false,  // TODO: determine from menuBehavior flags
-                onAccept: { _ in dismiss() },
-                onCancel: dismiss
-            )
-            nsWindow.contentViewController = NSHostingController(rootView: view)
-            if blocking {
-                NSApp.runModal(for: nsWindow)
-            } else {
-                nsWindow.makeKeyAndOrderFront(nil)
-            }
+            // Non-blocking: do nothing here — selectMenu will create the window.
+            // Blocking: show display-only and wait for dismiss.
+			assert(blocking)
+			assert(false)	// not sure this path is ever used
+			showMenuWindow(window: window, isSelectable: false, onAccept: nil, onCancel: nil)
 		case .map:
 			print("display map")
             break
@@ -307,7 +281,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func initWindows() {
-        // TODO: perform any window-system setup
+        isInitialized = true
     }
 
     func initStatus() {
@@ -329,56 +303,35 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Blocking input
 
     func needsLineInput(_ prompt: String, completion: @escaping (String?) -> Void) {
-        Task { @MainActor in
-            let response = await withCheckedContinuation { cont in
-                pendingLineContinuation = cont
-            }
-            completion(response)
-        }
+        pendingLineCompletion = completion
     }
 
     func needsKeyInput(_ completion: @escaping (Int32) -> Void) {
-        Task { @MainActor in
-            let key = await withCheckedContinuation { cont in
-                pendingKeyContinuation = cont
-            }
-            completion(key)
-        }
+        pendingKeyCompletion = completion
     }
 
     func needsKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
-        Task { @MainActor in
-            let result = await withCheckedContinuation {
-                (cont: CheckedContinuation<(key: Int32, x: Int32, y: Int32, mod: Int32), Never>) in
-                pendingKeyOrMouseContinuation = cont
-            }
-            completion(result.key, result.x, result.y, result.mod)
-        }
+        pendingKeyOrMouseCompletion = completion
     }
 
     func selectMenu(in window: NHWindowID, how: Int32,
                     completion: @escaping ([NHMenuSelection]?) -> Void) {
-        Task { @MainActor in
-            let selections = await withCheckedContinuation {
-                (cont: CheckedContinuation<[NHMenuSelection]?, Never>) in
-                pendingMenuContinuation = cont
-                showSelectMenu(window: window, how: how)
-            }
-            completion(selections)
-        }
+        showMenuWindow(
+            window: window,
+            isSelectable: how != 0,
+            onAccept: { selected in
+                completion(selected.map { NHMenuSelection(identifier: $0.identifier, count: 1) })
+            },
+            onCancel: { completion(nil) }
+        )
     }
 
-    private func showSelectMenu(window: NHWindowID, how: Int32) {
+    /// Creates and presents a menu window modally. `onAccept`/`onCancel` are called after dismiss.
+    /// Pass nil for both when the menu is display-only and no completion needs to be called.
+    private func showMenuWindow(window: NHWindowID, isSelectable: Bool,
+                                onAccept: (([MenuItemData]) -> Void)?,
+                                onCancel: (() -> Void)?) {
         guard let data = pendingWindows[window] else { return }
-
-        // PICK_NONE (0): display only — resolve immediately with empty selection.
-        if how == 0 {
-            let cont = pendingMenuContinuation
-            pendingMenuContinuation = nil
-            cont?.resume(returning: [])
-            return
-        }
-
         let items = data.menuItems.map { item in
             MenuItemData(
                 key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
@@ -387,32 +340,31 @@ extension NetHackController: NetHackBridgeDelegate {
             )
         }
         let categories = [MenuCategory(title: data.menuTitle, items: items)]
+        let nsWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 250, height: 100),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        nsWindow.title = data.menuTitle.isEmpty ? "Menu" : data.menuTitle
+        nsWindow.animationBehavior = .none
+        nsWindow.isRestorable = false
+        nsWindow.isReleasedWhenClosed = false
+        nhWindows[window] = nsWindow
+        // Use a local to capture what the user did; actual callbacks fire after runModal returns.
+        var accepted: [MenuItemData]? = nil
         let view = MenuWindowView(
             categories: categories,
-            isSelectable: true,
-            onAccept: { [weak self] selected in
-                guard let self else { return }
-                self.nhWindows.removeValue(forKey: window)
-                let cont = self.pendingMenuContinuation
-                self.pendingMenuContinuation = nil
-                let nhSelections = selected.map { item -> NHMenuSelection in
-                    NHMenuSelection(identifier: item.identifier, count: 1)
-                }
-                cont?.resume(returning: nhSelections)
-            },
-            onCancel: { [weak self] in
-                guard let self else { return }
-                self.nhWindows.removeValue(forKey: window)
-                let cont = self.pendingMenuContinuation
-                self.pendingMenuContinuation = nil
-                cont?.resume(returning: nil)
-            }
+            isSelectable: isSelectable,
+            onAccept: { selected in accepted = selected; NSApp.stopModal() },
+            onCancel: { NSApp.stopModal() }
         )
-        let hosting = NSHostingController(rootView: view)
-        let nsWindow = NSWindow(contentViewController: hosting)
-        nsWindow.title = data.menuTitle.isEmpty ? "Select" : data.menuTitle
-        nsWindow.styleMask = [.titled, .closable, .resizable]
-        nsWindow.makeKeyAndOrderFront(nil)
-        nhWindows[window] = nsWindow
+        nsWindow.contentViewController = NSHostingController(rootView: view)
+        NSApp.runModal(for: nsWindow)
+        if let accepted {
+            onAccept?(accepted)
+        } else {
+            onCancel?()
+        }
     }
 }
