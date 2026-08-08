@@ -159,17 +159,16 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func clearNhwindow(_ window: NHWindowID) {
         // Reset accumulated data so the window can be reused for new content.
-        pendingWindows[window]?.strings = []
-        pendingWindows[window]?.resetMenu()
+        pendingWindows[window]!.strings = []
+        pendingWindows[window]!.resetMenu()
         // Close the displayed window if it was already shown.
         nhWindows[window]?.close()
         nhWindows.removeValue(forKey: window)
     }
 
 	func displayNhwindow(_ window: NHWindowID, blocking: Bool) {
-		guard let data = pendingWindows[window] else {
-			fatalError()
-		}
+		let data = pendingWindows[window]!
+
         switch data.type {
         case .message:
             // NHW_MESSAGE is the top-line message log — append to the scrolling message list.
@@ -229,16 +228,19 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func displayFile(_ filename: String, complain: Bool) {
         print("display_file: \(filename)")
+		fatalError()
     }
 
     // MARK: Map
 
     func printGlyph(in window: NHWindowID, x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
         // TODO: render the glyph at (x, y) in the map window
+		print("printGlyph")
     }
 
-    func clipAround(_ x: Int32, y: Int32) {
+    func clipAround(x: Int32, y: Int32) {
         // TODO: scroll the map so (x, y) is visible
+		print("cliparound")
     }
 
     // MARK: Menus
@@ -268,28 +270,34 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
         // TODO: configure status field visibility
+		fatalError()
     }
 
     func updateStatusField(_ fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
         // TODO: update status bar field
+		print("updateStatusField")
     }
 
     // MARK: Misc output
 
     func updatePositionBar(_ positionBar: String) {
         // TODO: update position bar UI
+		fatalError()
     }
 
     func updateInventory() {
         // TODO: refresh inventory display
+		fatalError()
     }
 
     func putMessageHistory(_ message: String?, restoring: Bool) {
         // TODO: replay message into history
+		print("putMessageHistory")
     }
 
     func requestPlayerSelection() {
         // TODO: show character creation UI
+		print("requestPlayerSelection")
     }
 
     func initWindows() {
@@ -345,8 +353,9 @@ extension NetHackController: NetHackBridgeDelegate {
     private func showMenuWindow(window: NHWindowID,
                                 selectionMode: MenuSelectionMode,
                                 onAccept: (([MenuItemData]) -> Void)?,
-                                onCancel: (() -> Void)?) {
-        guard let data = pendingWindows[window] else { return }
+                                onCancel: (() -> Void)?)
+	{
+		let data = pendingWindows[window]!
         let items = data.menuItems.map { item in
             MenuItemData(
                 key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
