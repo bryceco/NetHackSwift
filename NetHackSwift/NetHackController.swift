@@ -47,7 +47,7 @@ private struct MessageWindowBridge: View {
 
     private let bridge = NetHackBridge()
 
-	func copyTo(playgroundURL: URL, from fromURL: URL) {
+	private func copyTo(playgroundURL: URL, from fromURL: URL) {
 		let fm = FileManager.default
 		let items = try! fm.contentsOfDirectory(at: fromURL,
 												includingPropertiesForKeys: nil,
@@ -104,7 +104,7 @@ private struct MessageWindowBridge: View {
 
 extension NetHackController: NetHackBridgeDelegate {
 
-	func nethackBridge(_ bridge: NetHackBridge, didCreateWindow window: NHWindowID, of type: NHWindowType) {
+	func nethackBridge(_ bridge: NetHackBridge, createNhwindow window: NHWindowID, of type: NHWindowType) {
 		switch type {
 		case .message:
 			let model = MessageWindowModel()
@@ -130,11 +130,11 @@ extension NetHackController: NetHackBridgeDelegate {
 		}
 	}
 
-    func nethackBridge(_ bridge: NetHackBridge, didPrint string: String) {
+    func nethackBridge(_ bridge: NetHackBridge, rawPrint string: String) {
         print(string)
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, didPrintBoldString string: String) {
+    func nethackBridge(_ bridge: NetHackBridge, rawPrintBold string: String) {
         print(string)
     }
 
@@ -142,13 +142,111 @@ extension NetHackController: NetHackBridgeDelegate {
         // Ignore cursor positioning — we're not rendering a grid yet.
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, didPut string: String, attribute: NHTextAttribute) {
+    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, putstr string: String, attribute: NHTextAttribute) {
         if let model = messageModels[window] {
             model.messages.append(string)
         } else {
             print(string)
         }
     }
+
+    // MARK: Window lifecycle
+
+    func nethackBridge(_ bridge: NetHackBridge, clearNhwindow window: NHWindowID) {
+        // TODO: clear the contents of the window
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, displayNhwindow window: NHWindowID) {
+        // TODO: make the window visible
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, destroyNhwindow window: NHWindowID) {
+        nhWindows.removeValue(forKey: window)
+        messageModels.removeValue(forKey: window)
+        menuModels.removeValue(forKey: window)
+    }
+
+    // MARK: Text output
+
+    func nethackBridge(_ bridge: NetHackBridge, displayFile filename: String, complain: Bool) {
+        print("display_file: \(filename)")
+    }
+
+    // MARK: Map
+
+    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, printGlyphAtX x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
+        // TODO: render the glyph at (x, y) in the map window
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, cliparound x: Int32, y: Int32) {
+        // TODO: scroll the map so (x, y) is visible
+    }
+
+    // MARK: Menus
+
+    func nethackBridge(_ bridge: NetHackBridge, startMenu window: NHWindowID, behavior: UInt) {
+        menuModels[window]?.reset()
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, addMenuItemWithAccel accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
+        // TODO: append item to menuModels[window]
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, endMenuInWindow window: NHWindowID, prompt: String?) {
+        if let model = menuModels[window] {
+            model.title = prompt ?? ""
+        }
+    }
+
+    // MARK: Status bar
+
+    func nethackBridge(_ bridge: NetHackBridge, enableStatusField fieldIndex: Int32, name: String, format: String, enabled: Bool) {
+        // TODO: configure status field visibility
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, updateStatusField fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
+        // TODO: update status bar field
+    }
+
+    // MARK: Misc output
+
+    func nethackBridge(_ bridge: NetHackBridge, updatePositionBar positionBar: String) {
+        // TODO: update position bar UI
+    }
+
+    func nethackBridgeUpdateInventory(_ bridge: NetHackBridge) {
+        // TODO: refresh inventory display
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, putMessageHistory message: String?, restoring: Bool) {
+        // TODO: replay message into history
+    }
+
+    func nethackBridgeRequestPlayerSelection(_ bridge: NetHackBridge) {
+        // TODO: show character creation UI
+    }
+
+    func nethackBridgeInitWindows(_ bridge: NetHackBridge) {
+        // TODO: perform any window-system setup
+    }
+
+    func nethackBridgeInitStatus(_ bridge: NetHackBridge) {
+        // TODO: perform any status-bar setup
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, exitWindowsWithMessage message: String?) {
+        print("exit_nhwindows: \(message ?? "")")
+    }
+
+    func nethackBridge(_ bridge: NetHackBridge, suspendWindowsWithMessage message: String?) {
+        // TODO: suspend UI
+    }
+
+    func nethackBridgeResumeWindows(_ bridge: NetHackBridge) {
+        // TODO: resume UI
+    }
+
+    // MARK: Blocking input
 
     func nethackBridge(_ bridge: NetHackBridge, needsLineInput request: NHLineInputRequest) {
         pendingLineRequest = request
