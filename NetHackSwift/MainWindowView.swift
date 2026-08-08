@@ -8,7 +8,7 @@ struct MainWindowView: View {
                     .frame(width: 366, height: 160)
                 EquipmentView()
                     .frame(width: 118, height: 160)
-                MessagesView()
+                MessagesView(model: MessageWindowModel())
                     .frame(minWidth: 153, maxWidth: .infinity)
                     .frame(height: 160)
             }

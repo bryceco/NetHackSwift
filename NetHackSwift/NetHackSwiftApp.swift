@@ -27,6 +27,7 @@ struct NetHackSwiftApp: App {
 					#endif
 					try? FileManager.default.createDirectory(at: playgroundURL,
 						withIntermediateDirectories: true)
+					controller.gameState = gameState
 					controller.start(playgroundURL: playgroundURL,
 					                 resourcesURL: resourcesURL)
 				}

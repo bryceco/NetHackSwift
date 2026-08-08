@@ -1,13 +1,20 @@
+import Observation
 import SwiftUI
 
+@Observable final class MessageWindowModel {
+    var messages: [String] = []
+    /// Flat string passed to MessageWindowView; rebuilt whenever messages changes.
+    var text: String { messages.joined(separator: "\n") }
+}
+
 struct MessagesView: View {
-    @Environment(GameState.self) private var gameState
+    var model: MessageWindowModel
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(gameState.messages.enumerated()), id: \.offset) { i, message in
+                    ForEach(Array(model.messages.enumerated()), id: \.offset) { i, message in
                         Text(message)
                             .font(.system(size: 13))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -17,7 +24,7 @@ struct MessagesView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
             }
-            .onChange(of: gameState.messages.count) { _, count in
+            .onChange(of: model.messages.count) { _, count in
                 if count > 0 {
                     proxy.scrollTo(count - 1, anchor: .bottom)
                 }
@@ -33,15 +40,14 @@ struct MessagesView: View {
 }
 
 #Preview {
-    let state = GameState()
-    state.messages = [
+    let model = MessageWindowModel()
+    model.messages = [
         "Hello, welcome to NetHack!",
         "You see a goblin.",
         "You hit the goblin.",
         "The goblin bites!",
         "You feel hungry.",
     ]
-    return MessagesView()
-        .environment(state)
+    return MessagesView(model: model)
         .frame(width: 153, height: 160)
 }

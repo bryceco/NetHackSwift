@@ -5,20 +5,45 @@
 //  Created by Bryce Cogswell on 8/6/26.
 //
 
+import AppKit
 import Foundation
 import Observation
+import SwiftUI
 import NetHackBridge
+
+/// Bridges an observable MessageWindowModel to the static-text MessageWindowView.
+/// Defined here (not in MessageWindowView.swift) because it is an implementation
+/// detail of how NetHackController wires up the window.
+private struct MessageWindowBridge: View {
+    var model: MessageWindowModel
+    var onClose: () -> Void
+    var body: some View {
+        MessageWindowView(text: model.text, onClose: onClose)
+    }
+}
 
 /// Manages the NetHack bridge and exposes its state to SwiftUI.
 /// All NetHackBridgeDelegate methods are guaranteed to arrive on the main thread.
 @Observable final class NetHackController: NSObject {
 
-    var outputLines: [String] = []
-
     // At most one of these is non-nil at a time.
     var pendingLineRequest: NHLineInputRequest?
     var pendingKeyRequest: NHKeyInputRequest?
     var pendingKeyOrMouseRequest: NHKeyOrMouseInputRequest?
+
+    /// Set by the app before calling start(). Injected into any windows the bridge opens.
+    var gameState: GameState?
+
+    /// NSWindows opened on behalf of NetHack, keyed by their NHWindowID.
+    /// Kept to maintain a strong reference so the windows aren't deallocated.
+    private var nhWindows: [NHWindowID: NSWindow] = [:]
+
+    /// Data models for message windows, keyed by their NHWindowID.
+    private var messageModels: [NHWindowID: MessageWindowModel] = [:]
+
+    /// Data models for menu windows, keyed by their NHWindowID.
+    /// The model is created here; the NSWindow is deferred until display_nhwindow.
+    private var menuModels: [NHWindowID: MenuWindowModel] = [:]
 
     private let bridge = NetHackBridge()
 
@@ -47,8 +72,8 @@ import NetHackBridge
 		fm.changeCurrentDirectoryPath(playgroundURL.path)
 
         bridge.delegate = self
-		bridge.run(withArguments: ["-d", playgroundURL.path]) { [weak self] exitCode in
-            self?.outputLines.append("--- NetHack exited (\(exitCode)) ---")
+		bridge.run(withArguments: ["-d", playgroundURL.path]) { exitCode in
+            print("--- NetHack exited (\(exitCode)) ---")
         }
     }
 
@@ -79,12 +104,38 @@ import NetHackBridge
 
 extension NetHackController: NetHackBridgeDelegate {
 
+	func nethackBridge(_ bridge: NetHackBridge, didCreateWindow window: NHWindowID, of type: NHWindowType) {
+		switch type {
+		case .message:
+			let model = MessageWindowModel()
+			messageModels[window] = model
+			let windowID = window
+			let view = MessageWindowBridge(model: model) { [weak self] in
+				self?.nhWindows.removeValue(forKey: windowID)
+			}
+			let hosting = NSHostingController(rootView: view)
+			let nsWindow = NSWindow(contentViewController: hosting)
+			nsWindow.title = "Messages"
+			nsWindow.styleMask = [.titled, .closable, .resizable]
+			nsWindow.makeKeyAndOrderFront(nil)
+			nhWindows[window] = nsWindow
+		case .map:
+			break
+		case .menu:
+			// Don't show the window yet — content is populated by start_menu/add_menu/end_menu
+			// and the window is presented when display_nhwindow fires.
+			menuModels[window] = MenuWindowModel()
+		default:
+			fatalError()
+		}
+	}
+
     func nethackBridge(_ bridge: NetHackBridge, didPrint string: String) {
-        outputLines.append(string)
+        print(string)
     }
 
     func nethackBridge(_ bridge: NetHackBridge, didPrintBoldString string: String) {
-        outputLines.append(string)
+        print(string)
     }
 
     func nethackBridge(_ bridge: NetHackBridge, didMoveCursorInWindow window: NHWindowID, x: Int32, y: Int32) {
@@ -92,7 +143,11 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, didPut string: String, attribute: NHTextAttribute) {
-        outputLines.append(string)
+        if let model = messageModels[window] {
+            model.messages.append(string)
+        } else {
+            print(string)
+        }
     }
 
     func nethackBridge(_ bridge: NetHackBridge, needsLineInput request: NHLineInputRequest) {
