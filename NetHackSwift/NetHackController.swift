@@ -104,7 +104,45 @@ private struct MessageWindowBridge: View {
 
 extension NetHackController: NetHackBridgeDelegate {
 
-	func createNhwindow(_ window: NHWindowID, of type: NHWindowType) {
+	// MARK: Initialize/shutdown
+
+	func initWindows() {
+		// TODO: perform any window-system setup
+	}
+
+	 func initStatus() {
+		 // TODO: perform any status-bar setup
+	 }
+
+	 func exitWindows(withMessage message: String?) {
+		 print("exit_nhwindows: \(message ?? "")")
+	 }
+
+	 func suspendWindows(withMessage message: String?) {
+		 // TODO: suspend UI
+	 }
+
+	 func resumeWindows() {
+		 // TODO: resume UI
+	 }
+
+	// MARK: Text output
+
+	func displayFile(_ filename: String, complain: Bool) {
+		print("display_file: \(filename)")
+	}
+
+	func rawPrint(_ string: String) {
+		print(string)
+	}
+
+	func rawPrintBold(_ string: String) {
+		print(string)
+	}
+
+	// MARK: Window lifecycle
+
+	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
 		switch type {
 		case .message:
 			let model = MessageWindowModel()
@@ -130,27 +168,9 @@ extension NetHackController: NetHackBridgeDelegate {
 		}
 	}
 
-    func rawPrint(_ string: String) {
-        print(string)
-    }
-
-    func rawPrintBold(_ string: String) {
-        print(string)
-    }
-
-    func didMoveCursor(inWindow window: NHWindowID, x: Int32, y: Int32) {
+	func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
         // Ignore cursor positioning — we're not rendering a grid yet.
     }
-
-    func window(_ window: NHWindowID, putstr string: String, attribute: NHTextAttribute) {
-        if let model = messageModels[window] {
-            model.messages.append(string)
-        } else {
-            print(string)
-        }
-    }
-
-    // MARK: Window lifecycle
 
     func clearNhwindow(_ window: NHWindowID) {
         // TODO: clear the contents of the window
@@ -166,33 +186,35 @@ extension NetHackController: NetHackBridgeDelegate {
         menuModels.removeValue(forKey: window)
     }
 
-    // MARK: Text output
-
-    func displayFile(_ filename: String, complain: Bool) {
-        print("display_file: \(filename)")
-    }
+	func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
+		if let model = messageModels[window] {
+			model.messages.append(string)
+		} else {
+			print(string)
+		}
+	}
 
     // MARK: Map
 
-    func window(_ window: NHWindowID, printGlyphAtX x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
+    func printGlyph(in window: NHWindowID, x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
         // TODO: render the glyph at (x, y) in the map window
     }
 
-    func cliparound(_ x: Int32, y: Int32) {
+    func clipAround(_ x: Int32, y: Int32) {
         // TODO: scroll the map so (x, y) is visible
     }
 
     // MARK: Menus
 
-    func startMenu(_ window: NHWindowID, behavior: UInt) {
+    func startMenu(in window: NHWindowID, behavior: UInt) {
         menuModels[window]?.reset()
     }
 
-    func window(_ window: NHWindowID, addMenuItemWithAccel accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
+    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
         // TODO: append item to menuModels[window]
     }
 
-    func endMenu(inWindow window: NHWindowID, prompt: String?) {
+    func endMenu(in window: NHWindowID, prompt: String?) {
         if let model = menuModels[window] {
             model.title = prompt ?? ""
         }
@@ -224,26 +246,6 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func requestPlayerSelection() {
         // TODO: show character creation UI
-    }
-
-    func initWindows() {
-        // TODO: perform any window-system setup
-    }
-
-    func initStatus() {
-        // TODO: perform any status-bar setup
-    }
-
-    func exitWindows(withMessage message: String?) {
-        print("exit_nhwindows: \(message ?? "")")
-    }
-
-    func suspendWindows(withMessage message: String?) {
-        // TODO: suspend UI
-    }
-
-    func resumeWindows() {
-        // TODO: resume UI
     }
 
     // MARK: Blocking input
