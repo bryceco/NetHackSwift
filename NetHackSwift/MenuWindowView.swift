@@ -1,23 +1,4 @@
-import Observation
 import SwiftUI
-
-// MARK: - Data Model
-
-/// Mutable state for a NetHack menu window.
-/// Populated by start_menu / add_menu / end_menu shim callbacks,
-/// then presented as a MenuWindowView when display_nhwindow fires.
-@Observable final class MenuWindowModel {
-    var title: String = ""
-    var categories: [MenuCategory] = []
-    var isSelectable: Bool = false
-
-    /// Clears accumulated content so the window can be reused for a new menu.
-    func reset() {
-        title = ""
-        categories = []
-        isSelectable = false
-    }
-}
 
 struct MenuCategory: Identifiable {
     var id = UUID()

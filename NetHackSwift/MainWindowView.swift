@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MainWindowView: View {
+    @Environment(GameState.self) private var state
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
@@ -8,7 +10,7 @@ struct MainWindowView: View {
                     .frame(width: 366, height: 160)
                 EquipmentView()
                     .frame(width: 118, height: 160)
-                MessagesView(model: MessageWindowModel())
+                MessagesView(messages: state.messages)
                     .frame(minWidth: 153, maxWidth: .infinity)
                     .frame(height: 160)
             }

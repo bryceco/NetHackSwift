@@ -11,16 +11,40 @@ import Observation
 import SwiftUI
 import NetHackBridge
 
-/// Bridges an observable MessageWindowModel to the static-text MessageWindowView.
-/// Defined here (not in MessageWindowView.swift) because it is an implementation
-/// detail of how NetHackController wires up the window.
-private struct MessageWindowBridge: View {
-    var model: MessageWindowModel
-    var onClose: () -> Void
-    var body: some View {
-        MessageWindowView(text: model.text, onClose: onClose)
+// MARK: - Window Data
+
+/// Accumulates all data for a NetHack window between createNhwindow and displayNhwindow.
+/// Once displayNhwindow is called the content is frozen and presented as a static view.
+private final class NHWindowData {
+    let type: NHWindowType
+    var strings: [String] = []
+
+    // Menu-specific fields, populated by start_menu / add_menu / end_menu.
+    var menuTitle: String = ""
+    var menuBehavior: UInt = 0
+    var menuItems: [NHMenuItem] = []
+
+    init(type: NHWindowType) {
+        self.type = type
+    }
+
+    func resetMenu() {
+        menuTitle = ""
+        menuBehavior = 0
+        menuItems = []
     }
 }
+
+private struct NHMenuItem {
+    var accel: CChar
+    var groupAccel: CChar
+    var attr: Int32
+    var color: Int32
+    var string: String
+    var flags: UInt32
+}
+
+// MARK: - Controller
 
 /// Manages the NetHack bridge and exposes its state to SwiftUI.
 /// All NetHackBridgeDelegate methods are guaranteed to arrive on the main thread.
@@ -34,16 +58,12 @@ private struct MessageWindowBridge: View {
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
 
+    /// Windows created by NetHack but not yet displayed (between createNhwindow and displayNhwindow).
+    private var pendingWindows: [NHWindowID: NHWindowData] = [:]
+
     /// NSWindows opened on behalf of NetHack, keyed by their NHWindowID.
     /// Kept to maintain a strong reference so the windows aren't deallocated.
     private var nhWindows: [NHWindowID: NSWindow] = [:]
-
-    /// Data models for message windows, keyed by their NHWindowID.
-    private var messageModels: [NHWindowID: MessageWindowModel] = [:]
-
-    /// Data models for menu windows, keyed by their NHWindowID.
-    /// The model is created here; the NSWindow is deferred until display_nhwindow.
-    private var menuModels: [NHWindowID: MenuWindowModel] = [:]
 
     private let bridge = NetHackBridge()
 
@@ -54,23 +74,15 @@ private struct MessageWindowBridge: View {
 												options: [.skipsHiddenFiles])
 		for item in items {
 			let dest = playgroundURL.appendingPathComponent(item.lastPathComponent)
-			guard
-				!fm.fileExists(atPath: dest.path)
-			else {
-				continue
-			}
+			guard !fm.fileExists(atPath: dest.path) else { continue }
 			try! fm.copyItem(at: item, to: dest)
 		}
 	}
 
     func start(playgroundURL: URL, resourcesURL: URL) {
-		// Copy default playground
 		let fm = FileManager.default
-
 		copyTo(playgroundURL: playgroundURL, from: resourcesURL.appendingPathComponent("Playground"))
-
 		fm.changeCurrentDirectoryPath(playgroundURL.path)
-
         bridge.delegate = self
 		bridge.run(withArguments: ["-d", playgroundURL.path]) { exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
@@ -104,166 +116,171 @@ private struct MessageWindowBridge: View {
 
 extension NetHackController: NetHackBridgeDelegate {
 
-	// MARK: Initialize/shutdown
+    func rawPrint(_ string: String) {
+        print(string)
+    }
 
-	func initWindows() {
-		// Nothing to do
-	}
+    func rawPrintBold(_ string: String) {
+        print(string)
+    }
 
-	 func initStatus() {
-		 // Nothing to do
-	 }
+    func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
+        // Ignore cursor positioning — not rendering a grid yet.
+    }
 
-	 func exitWindows(withMessage message: String?) {
-		 print("exit_nhwindows: \(message ?? "")")
-	 }
+    func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
+        if let data = pendingWindows[window] {
+            data.strings.append(string)
+        } else {
+            print(string)
+        }
+    }
 
-	 func suspendWindows(withMessage message: String?) {
-		 // TODO: suspend UI
-		 fatalError()
-	 }
-
-	 func resumeWindows() {
-		 // TODO: resume UI
-		 fatalError()
-	 }
-
-	// MARK: Text output
-
-	func displayFile(_ filename: String, complain: Bool) {
-		print("display_file: \(filename)")
-		fatalError()
-	}
-
-	func rawPrint(_ string: String) {
-		print(string)
-	}
-
-	func rawPrintBold(_ string: String) {
-		print(string)
-	}
-
-	// MARK: Window lifecycle
+    // MARK: Window lifecycle
 
 	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
-		print("createNhWindow(\(window), \(type))")
-		switch type {
-		case .message:
-			let model = MessageWindowModel()
-			messageModels[window] = model
-			let windowID = window
-			let view = MessageWindowBridge(model: model) { [weak self] in
-				self?.nhWindows.removeValue(forKey: windowID)
-			}
-			let hosting = NSHostingController(rootView: view)
-			let nsWindow = NSWindow(contentViewController: hosting)
-			nsWindow.title = "Messages"
-			nsWindow.styleMask = [.titled, .closable, .resizable]
-			nsWindow.makeKeyAndOrderFront(nil)
-			nhWindows[window] = nsWindow
-		case .map:
-			break
-		case .menu:
-			// Don't show the window yet — content is populated by start_menu/add_menu/end_menu
-			// and the window is presented when display_nhwindow fires.
-			menuModels[window] = MenuWindowModel()
-		default:
-			fatalError()
-		}
+		pendingWindows[window] = NHWindowData(type: type)
 	}
 
-	func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
-        // Ignore cursor positioning — we're not rendering a grid yet.
-		fatalError()
-    }
-
     func clearNhwindow(_ window: NHWindowID) {
-        // TODO: clear the contents of the window
-		fatalError()
+        // Reset accumulated data so the window can be reused for new content.
+        pendingWindows[window]?.strings = []
+        pendingWindows[window]?.resetMenu()
+        // Close the displayed window if it was already shown.
+        nhWindows[window]?.close()
+        nhWindows.removeValue(forKey: window)
     }
 
-    func displayNhwindow(_ window: NHWindowID) {
-        // TODO: make the window visible
-		fatalError()
+	func displayNhwindow(_ window: NHWindowID, blocking: Bool) {
+		guard let data = pendingWindows[window] else {
+			fatalError()
+		}
+        switch data.type {
+        case .message:
+            let text = data.strings.joined(separator: "\n")
+            let view = MessageWindowView(text: text) { [weak self] in
+                self?.nhWindows.removeValue(forKey: window)
+            }
+            let hosting = NSHostingController(rootView: view)
+            let nsWindow = NSWindow(contentViewController: hosting)
+            nsWindow.title = "Messages"
+            nsWindow.styleMask = [.titled, .closable, .resizable]
+            nsWindow.makeKeyAndOrderFront(nil)
+            nhWindows[window] = nsWindow
+        case .menu:
+            let items = data.menuItems.map { item in
+                MenuItemData(
+                    key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
+                    text: item.string
+                )
+            }
+            let categories = [MenuCategory(title: data.menuTitle, items: items)]
+            let view = MenuWindowView(
+                categories: categories,
+                isSelectable: false,  // TODO: determine from menuBehavior flags
+                onAccept: { [weak self] _ in self?.nhWindows.removeValue(forKey: window) },
+                onCancel: { [weak self] in self?.nhWindows.removeValue(forKey: window) }
+            )
+            let hosting = NSHostingController(rootView: view)
+            let nsWindow = NSWindow(contentViewController: hosting)
+            nsWindow.styleMask = [.titled, .closable, .resizable]
+            nsWindow.makeKeyAndOrderFront(nil)
+            nhWindows[window] = nsWindow
+        default:
+            break
+        }
     }
 
     func destroyNhwindow(_ window: NHWindowID) {
+        nhWindows[window]?.close()
         nhWindows.removeValue(forKey: window)
-        messageModels.removeValue(forKey: window)
-        menuModels.removeValue(forKey: window)
+        pendingWindows.removeValue(forKey: window)
     }
 
-	func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
-		if let model = messageModels[window] {
-			model.messages.append(string)
-		} else {
-			print(string)
-			fatalError()
-		}
-	}
+    // MARK: Text output
+
+    func displayFile(_ filename: String, complain: Bool) {
+        print("display_file: \(filename)")
+    }
 
     // MARK: Map
 
     func printGlyph(in window: NHWindowID, x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
         // TODO: render the glyph at (x, y) in the map window
-		fatalError()
     }
 
     func clipAround(_ x: Int32, y: Int32) {
         // TODO: scroll the map so (x, y) is visible
-		fatalError()
     }
 
     // MARK: Menus
 
     func startMenu(in window: NHWindowID, behavior: UInt) {
-        menuModels[window]?.reset()
+        pendingWindows[window]!.resetMenu()
+        pendingWindows[window]!.menuBehavior = behavior
     }
 
     func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
-        // TODO: append item to menuModels[window]
-		fatalError()
+        pendingWindows[window]!.menuItems.append(NHMenuItem(
+            accel: accel,
+            groupAccel: groupAccel,
+            attr: attr,
+            color: color,
+            string: string,
+            flags: flags
+        ))
     }
 
     func endMenu(in window: NHWindowID, prompt: String?) {
-		guard let model = menuModels[window] else {
-			fatalError()
-		}
-		model.title = prompt ?? ""
+        pendingWindows[window]!.menuTitle = prompt ?? ""
     }
 
     // MARK: Status bar
 
     func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
         // TODO: configure status field visibility
-		fatalError()
     }
 
     func updateStatusField(_ fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
         // TODO: update status bar field
-		fatalError()
     }
 
     // MARK: Misc output
 
     func updatePositionBar(_ positionBar: String) {
         // TODO: update position bar UI
-		fatalError()
     }
 
     func updateInventory() {
         // TODO: refresh inventory display
-		fatalError()
     }
 
     func putMessageHistory(_ message: String?, restoring: Bool) {
         // TODO: replay message into history
-		fatalError()
     }
 
     func requestPlayerSelection() {
         // TODO: show character creation UI
-		fatalError()
+    }
+
+    func initWindows() {
+        // TODO: perform any window-system setup
+    }
+
+    func initStatus() {
+        // TODO: perform any status-bar setup
+    }
+
+    func exitWindows(withMessage message: String?) {
+        print("exit_nhwindows: \(message ?? "")")
+    }
+
+    func suspendWindows(withMessage message: String?) {
+        // TODO: suspend UI
+    }
+
+    func resumeWindows() {
+        // TODO: resume UI
     }
 
     // MARK: Blocking input
