@@ -51,9 +51,11 @@ private struct NHMenuItem {
 @Observable final class NetHackController: NSObject {
 
     // At most one of these is non-nil at a time.
-    var pendingLineRequest: NHLineInputRequest?
-    var pendingKeyRequest: NHKeyInputRequest?
-    var pendingKeyOrMouseRequest: NHKeyOrMouseInputRequest?
+    // The completion stored here is called (on the main thread) to provide
+    // the return value and unblock the NetHack thread.
+    private var pendingKeyContinuation: CheckedContinuation<Int32, Never>?
+    private var pendingKeyOrMouseContinuation: CheckedContinuation<(key: Int32, x: Int32, y: Int32, mod: Int32), Never>?
+    private var pendingLineContinuation: CheckedContinuation<String?, Never>?
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -91,24 +93,27 @@ private struct NHMenuItem {
 
     /// Forward a keypress to whichever blocking key-input request is pending.
     func sendKey(_ key: Int32) {
-        if let req = pendingKeyRequest {
-            pendingKeyRequest = nil
-            req.fulfill(withKey: key)
-        } else if let req = pendingKeyOrMouseRequest {
-            pendingKeyOrMouseRequest = nil
-            req.fulfill(withKey: key)
+        if let cont = pendingKeyContinuation {
+            pendingKeyContinuation = nil
+            cont.resume(returning: key)
+        } else if let cont = pendingKeyOrMouseContinuation {
+            pendingKeyOrMouseContinuation = nil
+            cont.resume(returning: (key: key, x: 0, y: 0, mod: 0))
         }
+    }
+
+    /// Forward a mouse click to a pending nh_poskey request.
+    func sendMouseClick(x: Int32, y: Int32, mod: Int32) {
+        guard let cont = pendingKeyOrMouseContinuation else { return }
+        pendingKeyOrMouseContinuation = nil
+        cont.resume(returning: (key: 0, x: x, y: y, mod: mod))
     }
 
     /// Forward a line of text to a pending getlin request. Pass nil to cancel.
     func sendLine(_ line: String?) {
-        guard let req = pendingLineRequest else { return }
-        pendingLineRequest = nil
-        if let line {
-            req.fulfill(line)
-        } else {
-            req.cancel()
-        }
+        guard let cont = pendingLineContinuation else { return }
+        pendingLineContinuation = nil
+        cont.resume(returning: line)
     }
 }
 
@@ -285,15 +290,31 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Blocking input
 
-    func needsLineInput(_ request: NHLineInputRequest) {
-        pendingLineRequest = request
+    func needsLineInput(_ prompt: String, completion: @escaping (String?) -> Void) {
+        Task { @MainActor in
+            let response = await withCheckedContinuation { cont in
+                pendingLineContinuation = cont
+            }
+            completion(response)
+        }
     }
 
-    func needsKeyInput(_ request: NHKeyInputRequest) {
-        pendingKeyRequest = request
+    func needsKeyInput(_ completion: @escaping (Int32) -> Void) {
+        Task { @MainActor in
+            let key = await withCheckedContinuation { cont in
+                pendingKeyContinuation = cont
+            }
+            completion(key)
+        }
     }
 
-    func needsKeyOrMouseInput(_ request: NHKeyOrMouseInputRequest) {
-        pendingKeyOrMouseRequest = request
+    func needsKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
+        Task { @MainActor in
+            let result = await withCheckedContinuation {
+                (cont: CheckedContinuation<(key: Int32, x: Int32, y: Int32, mod: Int32), Never>) in
+                pendingKeyOrMouseContinuation = cont
+            }
+            completion(result.key, result.x, result.y, result.mod)
+        }
     }
 }
