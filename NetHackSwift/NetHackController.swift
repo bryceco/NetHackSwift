@@ -182,7 +182,10 @@ extension NetHackController: NetHackBridgeDelegate {
             panel.isMovableByWindowBackground = true
             nhWindows[window] = panel
             let view = MessageWindowView(text: text) { NSApp.stopModal() }
-            panel.contentViewController = NSHostingController(rootView: view)
+            let hc = NSHostingController(rootView: view)
+            hc.sizingOptions = .preferredContentSize
+            panel.contentViewController = hc
+            panel.contentMinSize = NSSize(width: 259, height: 100)
             if blocking {
                 NSApp.runModal(for: panel)
                 panel.close()
@@ -314,7 +317,8 @@ extension NetHackController: NetHackBridgeDelegate {
         pendingKeyOrMouseCompletion = completion
     }
 
-    func selectMenu(in window: NHWindowID, how: Int32,
+    func selectMenu(in window: NHWindowID,
+					how: Int32,
                     completion: @escaping ([NHMenuSelection]?) -> Void) {
         showMenuWindow(
             window: window,
@@ -328,7 +332,8 @@ extension NetHackController: NetHackBridgeDelegate {
 
     /// Creates and presents a menu window modally. `onAccept`/`onCancel` are called after dismiss.
     /// Pass nil for both when the menu is display-only and no completion needs to be called.
-    private func showMenuWindow(window: NHWindowID, isSelectable: Bool,
+    private func showMenuWindow(window: NHWindowID,
+								isSelectable: Bool,
                                 onAccept: (([MenuItemData]) -> Void)?,
                                 onCancel: (() -> Void)?) {
         guard let data = pendingWindows[window] else { return }
@@ -359,7 +364,10 @@ extension NetHackController: NetHackBridgeDelegate {
             onAccept: { selected in accepted = selected; NSApp.stopModal() },
             onCancel: { NSApp.stopModal() }
         )
-        nsWindow.contentViewController = NSHostingController(rootView: view)
+        let hc = NSHostingController(rootView: view)
+        hc.sizingOptions = .preferredContentSize
+        nsWindow.contentViewController = hc
+        nsWindow.contentMinSize = NSSize(width: 250, height: 100)
         NSApp.runModal(for: nsWindow)
         if let accepted {
             onAccept?(accepted)

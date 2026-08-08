@@ -8,7 +8,6 @@ struct MessageWindowView: View {
         (NSScreen.main?.visibleFrame.height ?? 800) * 0.6
     }
 
-    // Extracted so ViewThatFits can use the same content in both branches.
     private var textContent: some View {
         Text(text)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -18,12 +17,14 @@ struct MessageWindowView: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
-            // Sizes to text naturally; scrolls only when text exceeds maxTextHeight.
+            // ViewThatFits sizes to text naturally; falls back to a ScrollView only
+            // when text exceeds maxTextHeight. The frame(maxHeight:) here caps the
+            // ideal height that preferredContentSize uses for initial window sizing.
             ViewThatFits(in: .vertical) {
                 textContent
                 ScrollView { textContent }
-                    .frame(maxHeight: maxTextHeight)
             }
+            .frame(maxHeight: maxTextHeight)
 
             Button("Close", action: onClose)
                 .keyboardShortcut(.escape, modifiers: [])
@@ -32,7 +33,7 @@ struct MessageWindowView: View {
                 .padding(.bottom, 19)
                 .padding(.trailing, 21)
         }
-        .frame(minWidth: 259)
+        .frame(minWidth: 259, idealWidth: 400)
     }
 }
 
