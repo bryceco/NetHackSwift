@@ -42,6 +42,7 @@ private struct NHMenuItem {
     var color: Int32
     var string: String
     var flags: UInt32
+    var identifier: Data  // opaque copy of NetHack's 'anything' value
 }
 
 // MARK: - Controller
@@ -56,6 +57,7 @@ private struct NHMenuItem {
     private var pendingKeyContinuation: CheckedContinuation<Int32, Never>?
     private var pendingKeyOrMouseContinuation: CheckedContinuation<(key: Int32, x: Int32, y: Int32, mod: Int32), Never>?
     private var pendingLineContinuation: CheckedContinuation<String?, Never>?
+    private var pendingMenuContinuation: CheckedContinuation<[NHMenuSelection]?, Never>?
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -163,6 +165,7 @@ extension NetHackController: NetHackBridgeDelegate {
         switch data.type {
         case .message:
             let text = data.strings.joined(separator: "\n")
+			print("message: \(text)")
             let view = MessageWindowView(text: text) { [weak self] in
                 self?.nhWindows.removeValue(forKey: window)
             }
@@ -176,7 +179,8 @@ extension NetHackController: NetHackBridgeDelegate {
             let items = data.menuItems.map { item in
                 MenuItemData(
                     key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
-                    text: item.string
+                    text: item.string,
+                    identifier: item.identifier
                 )
             }
             let categories = [MenuCategory(title: data.menuTitle, items: items)]
@@ -191,9 +195,18 @@ extension NetHackController: NetHackBridgeDelegate {
             nsWindow.styleMask = [.titled, .closable, .resizable]
             nsWindow.makeKeyAndOrderFront(nil)
             nhWindows[window] = nsWindow
-        default:
+		case .map:
+			print("display map")
             break
-        }
+		case .status:
+			print("display status")
+			break
+		case .text:
+			print("display text")
+			break
+		default:
+			fatalError()
+		}
     }
 
     func destroyNhwindow(_ window: NHWindowID) {
@@ -225,14 +238,15 @@ extension NetHackController: NetHackBridgeDelegate {
         pendingWindows[window]!.menuBehavior = behavior
     }
 
-    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
+    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: Data) {
         pendingWindows[window]!.menuItems.append(NHMenuItem(
             accel: accel,
             groupAccel: groupAccel,
             attr: attr,
             color: color,
             string: string,
-            flags: flags
+            flags: flags,
+            identifier: identifier
         ))
     }
 
@@ -316,5 +330,65 @@ extension NetHackController: NetHackBridgeDelegate {
             }
             completion(result.key, result.x, result.y, result.mod)
         }
+    }
+
+    func selectMenu(in window: NHWindowID, how: Int32,
+                    completion: @escaping ([NHMenuSelection]?) -> Void) {
+        Task { @MainActor in
+            let selections = await withCheckedContinuation {
+                (cont: CheckedContinuation<[NHMenuSelection]?, Never>) in
+                pendingMenuContinuation = cont
+                showSelectMenu(window: window, how: how)
+            }
+            completion(selections)
+        }
+    }
+
+    private func showSelectMenu(window: NHWindowID, how: Int32) {
+        guard let data = pendingWindows[window] else { return }
+
+        // PICK_NONE (0): display only — resolve immediately with empty selection.
+        if how == 0 {
+            let cont = pendingMenuContinuation
+            pendingMenuContinuation = nil
+            cont?.resume(returning: [])
+            return
+        }
+
+        let items = data.menuItems.map { item in
+            MenuItemData(
+                key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
+                text: item.string,
+                identifier: item.identifier
+            )
+        }
+        let categories = [MenuCategory(title: data.menuTitle, items: items)]
+        let view = MenuWindowView(
+            categories: categories,
+            isSelectable: true,
+            onAccept: { [weak self] selected in
+                guard let self else { return }
+                self.nhWindows.removeValue(forKey: window)
+                let cont = self.pendingMenuContinuation
+                self.pendingMenuContinuation = nil
+                let nhSelections = selected.map { item -> NHMenuSelection in
+                    NHMenuSelection(identifier: item.identifier, count: 1)
+                }
+                cont?.resume(returning: nhSelections)
+            },
+            onCancel: { [weak self] in
+                guard let self else { return }
+                self.nhWindows.removeValue(forKey: window)
+                let cont = self.pendingMenuContinuation
+                self.pendingMenuContinuation = nil
+                cont?.resume(returning: nil)
+            }
+        )
+        let hosting = NSHostingController(rootView: view)
+        let nsWindow = NSWindow(contentViewController: hosting)
+        nsWindow.title = data.menuTitle.isEmpty ? "Select" : data.menuTitle
+        nsWindow.styleMask = [.titled, .closable, .resizable]
+        nsWindow.makeKeyAndOrderFront(nil)
+        nhWindows[window] = nsWindow
     }
 }

@@ -11,6 +11,7 @@ struct MenuItemData: Identifiable {
     var key: String         // inventory letter, e.g. "a"
     var image: NSImage?
     var text: String
+    var identifier: Data = Data()  // opaque copy of NetHack's 'anything' identifier
 }
 
 // MARK: - View
