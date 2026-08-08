@@ -107,11 +107,11 @@ extension NetHackController: NetHackBridgeDelegate {
 	// MARK: Initialize/shutdown
 
 	func initWindows() {
-		// TODO: perform any window-system setup
+		// Nothing to do
 	}
 
 	 func initStatus() {
-		 // TODO: perform any status-bar setup
+		 // Nothing to do
 	 }
 
 	 func exitWindows(withMessage message: String?) {
@@ -120,16 +120,19 @@ extension NetHackController: NetHackBridgeDelegate {
 
 	 func suspendWindows(withMessage message: String?) {
 		 // TODO: suspend UI
+		 fatalError()
 	 }
 
 	 func resumeWindows() {
 		 // TODO: resume UI
+		 fatalError()
 	 }
 
 	// MARK: Text output
 
 	func displayFile(_ filename: String, complain: Bool) {
 		print("display_file: \(filename)")
+		fatalError()
 	}
 
 	func rawPrint(_ string: String) {
@@ -143,6 +146,7 @@ extension NetHackController: NetHackBridgeDelegate {
 	// MARK: Window lifecycle
 
 	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
+		print("createNhWindow(\(window), \(type))")
 		switch type {
 		case .message:
 			let model = MessageWindowModel()
@@ -170,14 +174,17 @@ extension NetHackController: NetHackBridgeDelegate {
 
 	func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
         // Ignore cursor positioning — we're not rendering a grid yet.
+		fatalError()
     }
 
     func clearNhwindow(_ window: NHWindowID) {
         // TODO: clear the contents of the window
+		fatalError()
     }
 
     func displayNhwindow(_ window: NHWindowID) {
         // TODO: make the window visible
+		fatalError()
     }
 
     func destroyNhwindow(_ window: NHWindowID) {
@@ -191,6 +198,7 @@ extension NetHackController: NetHackBridgeDelegate {
 			model.messages.append(string)
 		} else {
 			print(string)
+			fatalError()
 		}
 	}
 
@@ -198,10 +206,12 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func printGlyph(in window: NHWindowID, x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
         // TODO: render the glyph at (x, y) in the map window
+		fatalError()
     }
 
     func clipAround(_ x: Int32, y: Int32) {
         // TODO: scroll the map so (x, y) is visible
+		fatalError()
     }
 
     // MARK: Menus
@@ -212,40 +222,48 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
         // TODO: append item to menuModels[window]
+		fatalError()
     }
 
     func endMenu(in window: NHWindowID, prompt: String?) {
-        if let model = menuModels[window] {
-            model.title = prompt ?? ""
-        }
+		guard let model = menuModels[window] else {
+			fatalError()
+		}
+		model.title = prompt ?? ""
     }
 
     // MARK: Status bar
 
     func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
         // TODO: configure status field visibility
+		fatalError()
     }
 
     func updateStatusField(_ fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
         // TODO: update status bar field
+		fatalError()
     }
 
     // MARK: Misc output
 
     func updatePositionBar(_ positionBar: String) {
         // TODO: update position bar UI
+		fatalError()
     }
 
     func updateInventory() {
         // TODO: refresh inventory display
+		fatalError()
     }
 
     func putMessageHistory(_ message: String?, restoring: Bool) {
         // TODO: replay message into history
+		fatalError()
     }
 
     func requestPlayerSelection() {
         // TODO: show character creation UI
+		fatalError()
     }
 
     // MARK: Blocking input
