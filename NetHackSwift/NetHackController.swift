@@ -168,18 +168,26 @@ extension NetHackController: NetHackBridgeDelegate {
             gameState?.messages.append(contentsOf: data.strings)
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
-            let view = MessageWindowView(text: text) { [weak self] in
-                self?.nhWindows.removeValue(forKey: window)
+            let hasTitle = !data.menuTitle.isEmpty
+            let panel = NSPanel(
+                contentRect: NSRect(x: 0, y: 0, width: 259, height: 100),
+                styleMask: hasTitle ? [.titled, .closable, .resizable] : [.closable, .resizable, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            if hasTitle { panel.title = data.menuTitle }
+            panel.isMovableByWindowBackground = true
+            nhWindows[window] = panel
+            let view = MessageWindowView(text: text) { [weak self, weak panel] in
                 if blocking { NSApp.stopModal() }
+                panel?.close()
+                self?.nhWindows.removeValue(forKey: window)
             }
-            let hosting = NSHostingController(rootView: view)
-            let nsWindow = NSWindow(contentViewController: hosting)
-            nsWindow.styleMask = [.titled, .closable, .resizable]
-            nhWindows[window] = nsWindow
+            panel.contentViewController = NSHostingController(rootView: view)
             if blocking {
-                NSApp.runModal(for: nsWindow)
+                NSApp.runModal(for: panel)
             } else {
-                nsWindow.makeKeyAndOrderFront(nil)
+                panel.makeKeyAndOrderFront(nil)
             }
         case .menu:
             let items = data.menuItems.map { item in
@@ -190,9 +198,17 @@ extension NetHackController: NetHackBridgeDelegate {
                 )
             }
             let categories = [MenuCategory(title: data.menuTitle, items: items)]
-            let dismiss: () -> Void = { [weak self] in
-                self?.nhWindows.removeValue(forKey: window)
+            let nsWindow = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 250, height: 100),
+                styleMask: [.titled, .closable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            nhWindows[window] = nsWindow
+            let dismiss: () -> Void = { [weak self, weak nsWindow] in
                 if blocking { NSApp.stopModal() }
+                nsWindow?.close()
+                self?.nhWindows.removeValue(forKey: window)
             }
             let view = MenuWindowView(
                 categories: categories,
@@ -200,10 +216,7 @@ extension NetHackController: NetHackBridgeDelegate {
                 onAccept: { _ in dismiss() },
                 onCancel: dismiss
             )
-            let hosting = NSHostingController(rootView: view)
-            let nsWindow = NSWindow(contentViewController: hosting)
-            nsWindow.styleMask = [.titled, .closable, .resizable]
-            nhWindows[window] = nsWindow
+            nsWindow.contentViewController = NSHostingController(rootView: view)
             if blocking {
                 NSApp.runModal(for: nsWindow)
             } else {
