@@ -1,5 +1,13 @@
 import SwiftUI
 
+// MARK: - Models
+
+enum MenuSelectionMode {
+    case none   // PICK_NONE (0) — display only, no selection
+    case one    // PICK_ONE  (1) — radio buttons, at most one item selected
+    case any    // PICK_ANY  (2) — checkboxes, any number of items selected
+}
+
 struct MenuCategory: Identifiable {
     var id = UUID()
     var title: String
@@ -18,14 +26,13 @@ struct MenuItemData: Identifiable {
 
 struct MenuWindowView: View {
     let categories: [MenuCategory]
-    /// When true, checkboxes appear and Accept/Cancel/All buttons are shown.
-    /// When false, a single Close button is shown.
-    let isSelectable: Bool
+    let selectionMode: MenuSelectionMode
     var onAccept: ([MenuItemData]) -> Void
     var onCancel: () -> Void
 
     @State private var selectedIDs: Set<UUID> = []
     @State private var sortAlphabetically = false
+    @FocusState private var isFocused: Bool
 
     // Cap the scroll area at 70% of the screen so the window never grows off-screen.
     private var maxScrollHeight: CGFloat {
@@ -65,17 +72,29 @@ struct MenuWindowView: View {
                     .padding(.horizontal, 20)
 
                 ForEach(category.items) { item in
-                    MenuItemRow(
-                        item: item,
-                        isSelectable: isSelectable,
-                        isSelected: Binding(
-                            get: { selectedIDs.contains(item.id) },
-                            set: { selected in
-                                if selected { selectedIDs.insert(item.id) }
-                                else { selectedIDs.remove(item.id) }
-                            }
+                    if item.text.isEmpty {
+                        Spacer().frame(height: 6)
+                    } else {
+                        MenuItemRow(
+                            item: item,
+                            selectionMode: selectionMode,
+                            isSelected: Binding(
+                                get: { selectedIDs.contains(item.id) },
+                                set: { selected in
+                                    if selected {
+                                        // Radio buttons allow only one selection at a time.
+                                        if selectionMode == .one {
+                                            selectedIDs = [item.id]
+                                        } else {
+                                            selectedIDs.insert(item.id)
+                                        }
+                                    } else {
+                                        selectedIDs.remove(item.id)
+                                    }
+                                }
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -107,30 +126,51 @@ struct MenuWindowView: View {
 
             Divider()
 
-            // Button row
+            // Button row — varies by selection mode.
             HStack(spacing: 14) {
-                if isSelectable {
+                if selectionMode == .any {
                     Button("All", action: toggleSelectAll)
                         .keyboardShortcut("a", modifiers: .command)
                 }
                 Spacer()
-                if isSelectable {
+                switch selectionMode {
+                case .none:
+                    Button("Close") { onAccept(selectedItems) }
+                        .keyboardShortcut(.return, modifiers: [])
+                        .keyboardShortcut(.escape, modifiers: [])
+                        .buttonStyle(.borderedProminent)
+                case .one, .any:
                     Button("Cancel", action: onCancel)
                         .keyboardShortcut(.escape, modifiers: [])
                     Button("Accept") { onAccept(selectedItems) }
                         .keyboardShortcut(.return, modifiers: [])
                         .buttonStyle(.borderedProminent)
                         .disabled(selectedIDs.isEmpty)
-                } else {
-                    Button("Close") { onAccept(selectedItems) }
-                        .keyboardShortcut(.return, modifiers: [])
-                        .buttonStyle(.borderedProminent)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
         .frame(minWidth: 250, minHeight: 100)
+        .focusable()
+        .focused($isFocused)
+        .onAppear { isFocused = true }
+        .onKeyPress { press in
+            guard selectionMode != .none,
+                  let char = press.characters.first,
+                  let item = allItems.first(where: { $0.key == String(char) })
+            else { return .ignored }
+            if selectionMode == .one {
+                selectedIDs = [item.id]
+            } else {
+                if selectedIDs.contains(item.id) {
+                    selectedIDs.remove(item.id)
+                } else {
+                    selectedIDs.insert(item.id)
+                }
+            }
+            return .handled
+        }
     }
 }
 
@@ -138,12 +178,18 @@ struct MenuWindowView: View {
 
 private struct MenuItemRow: View {
     let item: MenuItemData
-    let isSelectable: Bool
+    let selectionMode: MenuSelectionMode
     @Binding var isSelected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            if isSelectable {
+            switch selectionMode {
+            case .none:
+                EmptyView()
+            case .one:
+                Image(systemName: isSelected ? "circle.inset.filled" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            case .any:
                 Toggle("", isOn: $isSelected)
                     .toggleStyle(.checkbox)
                     .labelsHidden()
@@ -151,10 +197,12 @@ private struct MenuItemRow: View {
 
             if let image = item.image {
                 Image(nsImage: image)
-                    .resizable()
+                
+					.resizable()
                     .scaledToFit()
                     .frame(width: 32, height: 32)
-            } else {
+            } else if selectionMode != .none {
+                // Spacer placeholder keeps text aligned when there are no glyphs.
                 Color.clear.frame(width: 32, height: 32)
             }
 
@@ -169,7 +217,7 @@ private struct MenuItemRow: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onTapGesture {
-            if isSelectable { isSelected.toggle() }
+            if selectionMode != .none { isSelected.toggle() }
         }
     }
 }
@@ -197,17 +245,27 @@ private let sampleCategories: [MenuCategory] = [
 #Preview("Display Only") {
     MenuWindowView(
         categories: sampleCategories,
-        isSelectable: false,
+        selectionMode: .none,
         onAccept: { _ in },
         onCancel: { }
     )
     .frame(width: 398)
 }
 
-#Preview("Selectable") {
+#Preview("Pick One") {
     MenuWindowView(
         categories: sampleCategories,
-        isSelectable: true,
+        selectionMode: .one,
+        onAccept: { _ in },
+        onCancel: { }
+    )
+    .frame(width: 398)
+}
+
+#Preview("Pick Any") {
+    MenuWindowView(
+        categories: sampleCategories,
+        selectionMode: .any,
         onAccept: { _ in },
         onCancel: { }
     )

@@ -3,6 +3,7 @@ import SwiftUI
 struct MessageWindowView: View {
     let text: String
     var onClose: () -> Void
+    @FocusState private var isFocused: Bool
 
     private var maxTextHeight: CGFloat {
         (NSScreen.main?.visibleFrame.height ?? 800) * 0.6
@@ -34,6 +35,11 @@ struct MessageWindowView: View {
                 .padding(.trailing, 21)
         }
         .frame(minWidth: 259, idealWidth: 400)
+        .focusable()
+        .focusEffectDisabled()
+        .focused($isFocused)
+        .onAppear { isFocused = true }
+        .onKeyPress(.escape) { onClose(); return .handled }
     }
 }
 

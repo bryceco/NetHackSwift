@@ -11,6 +11,14 @@ import Observation
 import SwiftUI
 import NetHackBridge
 
+// MARK: - Keyable Panel
+
+/// NSPanel without a title bar can't become the key window by default.
+/// This subclass overrides that so blocking (modal) panels receive key events.
+private class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 // MARK: - Window Data
 
 /// Accumulates all data for a NetHack window between createNhwindow and displayNhwindow.
@@ -169,9 +177,10 @@ extension NetHackController: NetHackBridgeDelegate {
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
             let hasTitle = !data.menuTitle.isEmpty
-            let panel = NSPanel(
+            let panelClass: NSPanel.Type = blocking ? KeyablePanel.self : NSPanel.self
+            let panel = panelClass.init(
                 contentRect: NSRect(x: 0, y: 0, width: 259, height: 100),
-                styleMask: hasTitle ? [.titled, .closable, .resizable] : [.closable, .resizable, .nonactivatingPanel],
+                styleMask: hasTitle ? [.titled, .closable, .resizable] : (blocking ? [.closable, .resizable] : [.closable, .resizable, .nonactivatingPanel]),
                 backing: .buffered,
                 defer: false
             )
@@ -198,7 +207,7 @@ extension NetHackController: NetHackBridgeDelegate {
             // Blocking: show display-only and wait for dismiss.
 			assert(blocking)
 			assert(false)	// not sure this path is ever used
-			showMenuWindow(window: window, isSelectable: false, onAccept: nil, onCancel: nil)
+			showMenuWindow(window: window, selectionMode: .none, onAccept: nil, onCancel: nil)
 		case .map:
 			print("display map")
             break
@@ -320,9 +329,10 @@ extension NetHackController: NetHackBridgeDelegate {
     func selectMenu(in window: NHWindowID,
 					how: Int32,
                     completion: @escaping ([NHMenuSelection]?) -> Void) {
+        let selectionMode: MenuSelectionMode = how == 0 ? .none : how == 1 ? .one : .any
         showMenuWindow(
             window: window,
-            isSelectable: how != 0,
+            selectionMode: selectionMode,
             onAccept: { selected in
                 completion(selected.map { NHMenuSelection(identifier: $0.identifier, count: 1) })
             },
@@ -333,7 +343,7 @@ extension NetHackController: NetHackBridgeDelegate {
     /// Creates and presents a menu window modally. `onAccept`/`onCancel` are called after dismiss.
     /// Pass nil for both when the menu is display-only and no completion needs to be called.
     private func showMenuWindow(window: NHWindowID,
-								isSelectable: Bool,
+                                selectionMode: MenuSelectionMode,
                                 onAccept: (([MenuItemData]) -> Void)?,
                                 onCancel: (() -> Void)?) {
         guard let data = pendingWindows[window] else { return }
@@ -360,7 +370,7 @@ extension NetHackController: NetHackBridgeDelegate {
         var accepted: [MenuItemData]? = nil
         let view = MenuWindowView(
             categories: categories,
-            isSelectable: isSelectable,
+            selectionMode: selectionMode,
             onAccept: { selected in accepted = selected; NSApp.stopModal() },
             onCancel: { NSApp.stopModal() }
         )
