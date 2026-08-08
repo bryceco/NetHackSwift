@@ -103,7 +103,6 @@
 			);
 			name = NetHackSwift;
 			packageProductDependencies = (
-				0211637D3025376F00E0FC96 /* SwiftLibNethack */,
 				02F5766230254F8800F06F02 /* NetHackSwiftLib */,
 			);
 			productName = NetHackSwift;
@@ -386,10 +385,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0211637D3025376F00E0FC96 /* SwiftLibNethack */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = SwiftLibNethack;
-		};
 		02F5766230254F8800F06F02 /* NetHackSwiftLib */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NetHackSwiftLib;
