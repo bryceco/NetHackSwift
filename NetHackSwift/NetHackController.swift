@@ -104,7 +104,7 @@ private struct MessageWindowBridge: View {
 
 extension NetHackController: NetHackBridgeDelegate {
 
-	func nethackBridge(_ bridge: NetHackBridge, createNhwindow window: NHWindowID, of type: NHWindowType) {
+	func createNhwindow(_ window: NHWindowID, of type: NHWindowType) {
 		switch type {
 		case .message:
 			let model = MessageWindowModel()
@@ -130,19 +130,19 @@ extension NetHackController: NetHackBridgeDelegate {
 		}
 	}
 
-    func nethackBridge(_ bridge: NetHackBridge, rawPrint string: String) {
+    func rawPrint(_ string: String) {
         print(string)
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, rawPrintBold string: String) {
+    func rawPrintBold(_ string: String) {
         print(string)
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, didMoveCursorInWindow window: NHWindowID, x: Int32, y: Int32) {
+    func didMoveCursor(inWindow window: NHWindowID, x: Int32, y: Int32) {
         // Ignore cursor positioning — we're not rendering a grid yet.
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, putstr string: String, attribute: NHTextAttribute) {
+    func window(_ window: NHWindowID, putstr string: String, attribute: NHTextAttribute) {
         if let model = messageModels[window] {
             model.messages.append(string)
         } else {
@@ -152,15 +152,15 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Window lifecycle
 
-    func nethackBridge(_ bridge: NetHackBridge, clearNhwindow window: NHWindowID) {
+    func clearNhwindow(_ window: NHWindowID) {
         // TODO: clear the contents of the window
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, displayNhwindow window: NHWindowID) {
+    func displayNhwindow(_ window: NHWindowID) {
         // TODO: make the window visible
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, destroyNhwindow window: NHWindowID) {
+    func destroyNhwindow(_ window: NHWindowID) {
         nhWindows.removeValue(forKey: window)
         messageModels.removeValue(forKey: window)
         menuModels.removeValue(forKey: window)
@@ -168,31 +168,31 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Text output
 
-    func nethackBridge(_ bridge: NetHackBridge, displayFile filename: String, complain: Bool) {
+    func displayFile(_ filename: String, complain: Bool) {
         print("display_file: \(filename)")
     }
 
     // MARK: Map
 
-    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, printGlyphAtX x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
+    func window(_ window: NHWindowID, printGlyphAtX x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
         // TODO: render the glyph at (x, y) in the map window
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, cliparound x: Int32, y: Int32) {
+    func cliparound(_ x: Int32, y: Int32) {
         // TODO: scroll the map so (x, y) is visible
     }
 
     // MARK: Menus
 
-    func nethackBridge(_ bridge: NetHackBridge, startMenu window: NHWindowID, behavior: UInt) {
+    func startMenu(_ window: NHWindowID, behavior: UInt) {
         menuModels[window]?.reset()
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, window: NHWindowID, addMenuItemWithAccel accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
+    func window(_ window: NHWindowID, addMenuItemWithAccel accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UnsafeRawPointer) {
         // TODO: append item to menuModels[window]
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, endMenuInWindow window: NHWindowID, prompt: String?) {
+    func endMenu(inWindow window: NHWindowID, prompt: String?) {
         if let model = menuModels[window] {
             model.title = prompt ?? ""
         }
@@ -200,63 +200,63 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Status bar
 
-    func nethackBridge(_ bridge: NetHackBridge, enableStatusField fieldIndex: Int32, name: String, format: String, enabled: Bool) {
+    func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
         // TODO: configure status field visibility
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, updateStatusField fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
+    func updateStatusField(_ fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
         // TODO: update status bar field
     }
 
     // MARK: Misc output
 
-    func nethackBridge(_ bridge: NetHackBridge, updatePositionBar positionBar: String) {
+    func updatePositionBar(_ positionBar: String) {
         // TODO: update position bar UI
     }
 
-    func nethackBridgeUpdateInventory(_ bridge: NetHackBridge) {
+    func updateInventory() {
         // TODO: refresh inventory display
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, putMessageHistory message: String?, restoring: Bool) {
+    func putMessageHistory(_ message: String?, restoring: Bool) {
         // TODO: replay message into history
     }
 
-    func nethackBridgeRequestPlayerSelection(_ bridge: NetHackBridge) {
+    func requestPlayerSelection() {
         // TODO: show character creation UI
     }
 
-    func nethackBridgeInitWindows(_ bridge: NetHackBridge) {
+    func initWindows() {
         // TODO: perform any window-system setup
     }
 
-    func nethackBridgeInitStatus(_ bridge: NetHackBridge) {
+    func initStatus() {
         // TODO: perform any status-bar setup
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, exitWindowsWithMessage message: String?) {
+    func exitWindows(withMessage message: String?) {
         print("exit_nhwindows: \(message ?? "")")
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, suspendWindowsWithMessage message: String?) {
+    func suspendWindows(withMessage message: String?) {
         // TODO: suspend UI
     }
 
-    func nethackBridgeResumeWindows(_ bridge: NetHackBridge) {
+    func resumeWindows() {
         // TODO: resume UI
     }
 
     // MARK: Blocking input
 
-    func nethackBridge(_ bridge: NetHackBridge, needsLineInput request: NHLineInputRequest) {
+    func needsLineInput(_ request: NHLineInputRequest) {
         pendingLineRequest = request
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, needsKeyInput request: NHKeyInputRequest) {
+    func needsKeyInput(_ request: NHKeyInputRequest) {
         pendingKeyRequest = request
     }
 
-    func nethackBridge(_ bridge: NetHackBridge, needsKeyOrMouseInput request: NHKeyOrMouseInputRequest) {
+    func needsKeyOrMouseInput(_ request: NHKeyOrMouseInputRequest) {
         pendingKeyOrMouseRequest = request
     }
 }
