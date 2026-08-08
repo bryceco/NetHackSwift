@@ -164,17 +164,23 @@ extension NetHackController: NetHackBridgeDelegate {
 		}
         switch data.type {
         case .message:
+            // NHW_MESSAGE is the top-line message log — append to the scrolling message list.
+            gameState?.messages.append(contentsOf: data.strings)
+        case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
-			print("message: \(text)")
             let view = MessageWindowView(text: text) { [weak self] in
                 self?.nhWindows.removeValue(forKey: window)
+                if blocking { NSApp.stopModal() }
             }
             let hosting = NSHostingController(rootView: view)
             let nsWindow = NSWindow(contentViewController: hosting)
-            nsWindow.title = "Messages"
             nsWindow.styleMask = [.titled, .closable, .resizable]
-            nsWindow.makeKeyAndOrderFront(nil)
             nhWindows[window] = nsWindow
+            if blocking {
+                NSApp.runModal(for: nsWindow)
+            } else {
+                nsWindow.makeKeyAndOrderFront(nil)
+            }
         case .menu:
             let items = data.menuItems.map { item in
                 MenuItemData(
@@ -184,27 +190,32 @@ extension NetHackController: NetHackBridgeDelegate {
                 )
             }
             let categories = [MenuCategory(title: data.menuTitle, items: items)]
+            let dismiss: () -> Void = { [weak self] in
+                self?.nhWindows.removeValue(forKey: window)
+                if blocking { NSApp.stopModal() }
+            }
             let view = MenuWindowView(
                 categories: categories,
                 isSelectable: false,  // TODO: determine from menuBehavior flags
-                onAccept: { [weak self] _ in self?.nhWindows.removeValue(forKey: window) },
-                onCancel: { [weak self] in self?.nhWindows.removeValue(forKey: window) }
+                onAccept: { _ in dismiss() },
+                onCancel: dismiss
             )
             let hosting = NSHostingController(rootView: view)
             let nsWindow = NSWindow(contentViewController: hosting)
             nsWindow.styleMask = [.titled, .closable, .resizable]
-            nsWindow.makeKeyAndOrderFront(nil)
             nhWindows[window] = nsWindow
+            if blocking {
+                NSApp.runModal(for: nsWindow)
+            } else {
+                nsWindow.makeKeyAndOrderFront(nil)
+            }
 		case .map:
 			print("display map")
             break
 		case .status:
 			print("display status")
 			break
-		case .text:
-			print("display text")
-			break
-		default:
+			default:
 			fatalError()
 		}
     }
