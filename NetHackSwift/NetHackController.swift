@@ -76,8 +76,14 @@ private struct NHMenuItem {
     /// Kept to maintain a strong reference so the windows aren't deallocated.
     @ObservationIgnored private var nhWindows: [NHWindowID: NSWindow] = [:]
 
-    private let bridge = NetHackBridge()
+    private let bridge: NetHackBridge?
     var isInitialized = false
+
+    override init() {
+        let isPreview = getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false
+        bridge = isPreview ? nil : NetHackBridge()
+        super.init()
+    }
 
 	private func copyTo(playgroundURL: URL, from fromURL: URL) {
 		let fm = FileManager.default
@@ -92,11 +98,12 @@ private struct NHMenuItem {
 	}
 
     func start(playgroundURL: URL, resourcesURL: URL) {
-		let fm = FileManager.default
-		copyTo(playgroundURL: playgroundURL, from: resourcesURL.appendingPathComponent("Playground"))
-		fm.changeCurrentDirectoryPath(playgroundURL.path)
+        guard let bridge else { return }
+        let fm = FileManager.default
+        copyTo(playgroundURL: playgroundURL, from: resourcesURL.appendingPathComponent("Playground"))
+        fm.changeCurrentDirectoryPath(playgroundURL.path)
         bridge.delegate = self
-		bridge.run(withArguments: ["-d", playgroundURL.path]) { exitCode in
+        bridge.run(withArguments: ["-d", playgroundURL.path]) { exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
         }
     }
