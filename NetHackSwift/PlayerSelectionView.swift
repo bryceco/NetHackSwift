@@ -109,6 +109,7 @@ struct PlayerSelectionView: View {
             }
             .padding(.horizontal, 17)
         }
+        .background(Color(NSColor.windowBackgroundColor))
         .frame(width: 456, height: 441)
     }
 
@@ -129,6 +130,8 @@ struct PlayerSelectionView: View {
                 .opacity(race.isAvailable ? 1.0 : 0.4)
             }
         }
+        .alternatingRowBackgrounds(.disabled)
+        .border(Color(NSColor.separatorColor), width: 1)
         .onChange(of: selectedRaceID) { _, newID in
             guard let newID,
                   let race = races.first(where: { $0.id == newID }),
@@ -154,6 +157,8 @@ struct PlayerSelectionView: View {
                 .opacity(role.isAvailable ? 1.0 : 0.4)
             }
         }
+        .alternatingRowBackgrounds(.disabled)
+        .border(Color(NSColor.separatorColor), width: 1)
         .onChange(of: selectedRoleID) { _, newID in
             guard let newID,
                   let role = roles.first(where: { $0.id == newID }),
