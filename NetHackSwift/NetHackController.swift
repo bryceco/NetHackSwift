@@ -270,8 +270,35 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func updateStatusField(_ fieldIndex: Int32, text: String?, condBits: Int, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
-        // TODO: update status bar field
-        print("updateStatusField")
+        guard let state = gameState else { return }
+        // Parse text as Int, skipping any leading non-numeric prefix (e.g. "$:" on gold).
+        let intVal: Int = {
+            guard let text else { return 0 }
+            let s = text.drop(while: { !$0.isNumber && $0 != "-" })
+            return Int(s) ?? 0
+        }()
+        switch fieldIndex {
+        case  0: state.playerName   = text ?? ""                        // BL_TITLE
+        case  1: state.str          = text ?? ""                        // BL_STR (may be "18/01")
+        case  2: state.dex          = intVal                            // BL_DX
+        case  3: state.con          = intVal                            // BL_CO
+        case  4: state.int_         = intVal                            // BL_IN
+        case  5: state.wis          = intVal                            // BL_WI
+        case  6: state.cha          = intVal                            // BL_CH
+        case 10: state.gold         = intVal                            // BL_GOLD
+        case 11: state.pw           = intVal                            // BL_ENE
+        case 12: state.maxPw        = intVal                            // BL_ENEMAX
+        case 13: state.level        = intVal                            // BL_XP (experience level)
+        case 14: state.ac           = intVal                            // BL_AC
+        case 16: state.turn         = intVal                            // BL_TIME
+        case 18: state.hp           = intVal                            // BL_HP
+        case 19: state.maxHp        = intVal                            // BL_HPMAX
+        case 20: state.dlvl         = text ?? ""                        // BL_LEVELDESC
+        case 21: state.xp           = intVal                            // BL_EXP
+        case 22: state.statusEffects = statusEffectsString(from: condBits) // BL_CONDITION
+        default: break  // BL_ALIGN, BL_SCORE, BL_CAP, BL_HD, BL_HUNGER,
+                        // BL_WEAPON, BL_ARMOR, BL_TERRAIN, BL_VERS, flush/reset
+        }
     }
 
     // MARK: Misc output
@@ -395,3 +422,37 @@ extension NetHackController: NetHackBridgeDelegate {
         }
     }
 }
+// MARK: - Status helpers
+
+/// Converts a BL_CONDITION bitmask into a human-readable comma-separated string.
+private func statusEffectsString(from condBits: Int) -> String {
+    // (mask, display name) — ordered by rough importance for display
+    let conditions: [(Int, String)] = [
+        (0x00000002, "Blind"),
+        (0x00000008, "Confused"),
+        (0x00000400, "Hallucinating"),
+        (0x00400000, "Stunned"),
+        (0x00008000, "Paralyzed"),
+        (0x08000000, "Unconscious"),
+        (0x00020000, "Sleeping"),
+        (0x00100000, "Stoning"),
+        (0x00200000, "Strangling"),
+        (0x00000080, "FoodPois"),
+        (0x00000010, "Deaf"),
+        (0x00040000, "Slimed"),
+        (0x00800000, "Submerged"),
+        (0x00002000, "InLava"),
+        (0x00004000, "Levitating"),
+        (0x00000040, "Flying"),
+        (0x00010000, "Riding"),
+        (0x10000000, "WoundedLegs"),
+        (0x04000000, "Trapped"),
+        (0x00000200, "Grabbed"),
+        (0x00000800, "Held"),
+    ]
+    return conditions
+        .filter { condBits & $0.0 != 0 }
+        .map(\.1)
+        .joined(separator: ", ")
+}
+
