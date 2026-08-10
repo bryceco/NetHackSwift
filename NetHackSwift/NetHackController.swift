@@ -281,9 +281,12 @@ extension NetHackController: NetHackBridgeDelegate {
 		fatalError()
     }
 
-    func updateInventory() {
-        // TODO: refresh inventory display
-		fatalError()
+    func updateInventory(_ slots: [NHEquipItem]) {
+        var equip: [NHEquipSlot: NHEquipItem] = [:]
+        for item in slots where item.glyph.glyph != -1 {  // -1 == NO_GLYPH
+            equip[item.slot] = item
+        }
+        gameState?.equipment = equip
     }
 
     func putMessageHistory(_ message: String?, restoring: Bool) {

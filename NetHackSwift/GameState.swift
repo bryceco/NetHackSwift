@@ -1,4 +1,5 @@
 import AppKit
+import NetHackBridge
 import Observation
 
 @Observable
@@ -39,16 +40,11 @@ final class GameState {
     // Scrolling message log
     var messages: [String] = []
 
-    // Equipment images keyed by slot; nil means the slot is empty
-    var equipment: [EquipmentSlot: NSImage] = [:]
+    // Equipped items keyed by slot; missing key means the slot is empty
+    var equipment: [NHEquipSlot: NHEquipItem] = [:]
 
     var hpDisplay: String { "\(hp)(\(maxHp))" }
     var pwDisplay: String { "\(pw)(\(maxPw))" }
 }
 
-enum EquipmentSlot: CaseIterable, Hashable {
-    case amulet, helmet, blindfold
-    case weaponHand, armor, alternateHand
-    case gloves, shirt, cloak
-    case ringLeft, boots, ringRight
-}
+

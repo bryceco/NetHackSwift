@@ -30,7 +30,6 @@
 				Playground/logfile,
 				Playground/perm,
 				Playground/record,
-				Playground/sysconf,
 				Playground/xlogfile,
 			);
 			target = 0211635D30251D5100E0FC96 /* NetHackSwift */;

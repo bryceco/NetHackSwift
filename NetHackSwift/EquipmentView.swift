@@ -1,14 +1,15 @@
+import NetHackBridge
 import SwiftUI
 
 struct EquipmentView: View {
     @Environment(GameState.self) private var gameState
 
-    // Slot order matches the 4×3 grid in the XIB (row-major, top to bottom)
-    private let slotOrder: [EquipmentSlot] = [
-        .amulet,     .helmet,  .blindfold,
-        .weaponHand, .armor,   .alternateHand,
-        .gloves,     .shirt,   .cloak,
-        .ringLeft,   .boots,   .ringRight,
+    // Slot order matches the 4×3 grid (row-major, top to bottom)
+    private let slotOrder: [NHEquipSlot] = [
+        .amulet,   .helmet, .blindfold,
+        .weapon,   .armor,  .altHand,
+        .gloves,   .shirt,  .cloak,
+        .ringLeft, .boots,  .ringRight,
     ]
 
     private let columns = Array(repeating: GridItem(.fixed(32), spacing: 0), count: 3)
@@ -18,7 +19,7 @@ struct EquipmentView: View {
             Text("Wearing:")
             LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(slotOrder, id: \.self) { slot in
-                    SlotView(image: gameState.equipment[slot])
+                    SlotView(item: gameState.equipment[slot])
                 }
             }
             .frame(width: 96, height: 128)
@@ -28,7 +29,7 @@ struct EquipmentView: View {
 }
 
 private struct SlotView: View {
-    var image: NSImage?
+    var item: NHEquipItem?
 
     var body: some View {
         ZStack {
@@ -38,14 +39,10 @@ private struct SlotView: View {
                     RoundedRectangle(cornerRadius: 2)
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(2)
-            }
+            // TODO: render item tile from item.glyph
         }
         .frame(width: 32, height: 32)
+        .help(item?.name ?? "")
     }
 }
 
