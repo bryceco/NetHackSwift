@@ -50,7 +50,7 @@ private struct NHMenuItem {
     var color: Int32
     var string: String
     var flags: UInt32
-    var identifier: Data  // opaque copy of NetHack's 'anything' value
+    var identifier: UInt  // anything value (as uintptr_t) passed through from addMenu
 }
 
 // MARK: - Controller
@@ -85,27 +85,16 @@ private struct NHMenuItem {
         super.init()
     }
 
-	private func copyTo(playgroundURL: URL, from fromURL: URL) {
-		let fm = FileManager.default
-		let items = try! fm.contentsOfDirectory(at: fromURL,
-												includingPropertiesForKeys: nil,
-												options: [.skipsHiddenFiles])
-		for item in items {
-			let dest = playgroundURL.appendingPathComponent(item.lastPathComponent)
-			guard !fm.fileExists(atPath: dest.path) else { continue }
-			try! fm.copyItem(at: item, to: dest)
-		}
-	}
-
-    func start(playgroundURL: URL, resourcesURL: URL) {
+    func start(playgroundURL: URL,
+			   resourcesURL: URL)
+	{
         guard let bridge else { return }
-        let fm = FileManager.default
-        copyTo(playgroundURL: playgroundURL, from: resourcesURL.appendingPathComponent("Playground"))
-        fm.changeCurrentDirectoryPath(playgroundURL.path)
         bridge.delegate = self
-        bridge.run(withArguments: ["-d", playgroundURL.path]) { exitCode in
+        bridge.run(withHackdirURL: resourcesURL,
+				   playgroundURL: playgroundURL,
+				   completion: { exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
-        }
+        })
     }
 
     /// Forward a keypress to whichever blocking key-input request is pending.
@@ -161,6 +150,7 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Window lifecycle
 
 	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
+		print("createNhwindow: \(window)")
 		pendingWindows[window] = NHWindowData(type: type)
 	}
 
@@ -257,7 +247,7 @@ extension NetHackController: NetHackBridgeDelegate {
         pendingWindows[window]!.menuBehavior = behavior
     }
 
-    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: Data) {
+    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UInt) {
         pendingWindows[window]!.menuItems.append(NHMenuItem(
             accel: accel,
             groupAccel: groupAccel,
@@ -276,13 +266,12 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Status bar
 
     func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
-        // TODO: configure status field visibility
-		fatalError()
+        // nothing to do
     }
 
-    func updateStatusField(_ fieldIndex: Int32, ptr: UnsafeRawPointer, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
+    func updateStatusField(_ fieldIndex: Int32, text: String?, condBits: Int, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
         // TODO: update status bar field
-		print("updateStatusField")
+        print("updateStatusField")
     }
 
     // MARK: Misc output

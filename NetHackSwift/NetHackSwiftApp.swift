@@ -5,6 +5,19 @@ struct NetHackSwiftApp: App {
     private let gameState = GameState()
     private let controller: NetHackController?
 
+
+	static private func copyTo(playgroundURL: URL, from fromURL: URL) {
+		let fm = FileManager.default
+		let items = try! fm.contentsOfDirectory(at: fromURL,
+												includingPropertiesForKeys: nil,
+												options: [.skipsHiddenFiles])
+		for item in items {
+			let dest = playgroundURL.appendingPathComponent(item.lastPathComponent)
+			guard !fm.fileExists(atPath: dest.path) else { continue }
+			try! fm.copyItem(at: item, to: dest)
+		}
+	}
+	
     init() {
         // Previews run the full app, but NetHackBridge's ObjC classes are not
         // available in the JIT preview context. Skip bridge creation entirely.
@@ -25,9 +38,18 @@ struct NetHackSwiftApp: App {
 #endif
         try? FileManager.default.createDirectory(at: playgroundURL,
                                                  withIntermediateDirectories: true)
+
+		// Copy initial writable game files (livelog, logfile, etc.) on first run.
+		// nhdat and sysconf live in Resources/ and are never copied — NetHack
+		// reads them read-only directly from the app bundle.
+		Self.copyTo(playgroundURL: playgroundURL,
+					from: resourcesURL.appendingPathComponent("Playground"))
+		FileManager.default.changeCurrentDirectoryPath(resourcesURL.path)
+
         let c = NetHackController()
         c.gameState = gameState
-        c.start(playgroundURL: playgroundURL, resourcesURL: resourcesURL)
+        c.start(playgroundURL: playgroundURL,
+				resourcesURL: resourcesURL)
         controller = c
     }
 
