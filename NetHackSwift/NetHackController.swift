@@ -290,8 +290,9 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func putMessageHistory(_ message: String?, restoring: Bool) {
-        // TODO: replay message into history
-		print("putMessageHistory")
+        if let message, !message.isEmpty {
+            gameState?.messages.append(message)
+        }
     }
 
     func requestPlayerSelection() {
