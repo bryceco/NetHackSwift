@@ -237,7 +237,6 @@ extension NetHackController: NetHackBridgeDelegate {
 					glyphInfo: UnsafePointer<nhswift_glyph>,
 					backgroundGlyphInfo: UnsafePointer<nhswift_glyph>)
 	{
-		print("glyph at \(x), \(y): fg: \(glyphInfo.pointee.gm.tileidx), bg: \(backgroundGlyphInfo.pointee.gm.tileidx)")
         guard let state = gameState,
               x >= 0, x < Int32(GameState.mapCols),
               y >= 0, y < Int32(GameState.mapRows) else { return }

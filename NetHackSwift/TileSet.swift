@@ -50,6 +50,6 @@ final class TileSet {
 
     func image(forGlyph glyph: nhswift_glyph, enabled: Bool = true) -> NSImage? {
         guard glyph.glyph >= 0 else { return nil }
-		return image(forTile: Int(glyph.gm.tileidx), enabled: enabled)
+        return image(forTile: Int(glyph.gm.tileidx), enabled: enabled)
     }
 }
