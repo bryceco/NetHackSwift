@@ -136,7 +136,10 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
-        // Ignore cursor positioning — not rendering a grid yet.
+        if pendingWindows[window]?.type == .map {
+            gameState?.mapCursorX = x
+            gameState?.mapCursorY = y
+        }
     }
 
     func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
@@ -205,8 +208,8 @@ extension NetHackController: NetHackBridgeDelegate {
 			assert(false)	// not sure this path is ever used
 			showMenuWindow(window: window, selectionMode: .none, onAccept: nil, onCancel: nil)
 		case .map:
-			print("display map")
-            break
+			print("update map tiles")
+			gameState?.mapVersion += 1
 		case .status:
 			print("display status")
 			break
@@ -230,9 +233,17 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Map
 
-    func printGlyph(in window: NHWindowID, x: Int32, y: Int32, glyphInfo: UnsafeRawPointer, backgroundGlyphInfo: UnsafeRawPointer) {
-        // TODO: render the glyph at (x, y) in the map window
-		print("printGlyph")
+    func printGlyph(in window: NHWindowID, x: Int32, y: Int32,
+					glyphInfo: UnsafePointer<nhswift_glyph>,
+					backgroundGlyphInfo: UnsafePointer<nhswift_glyph>)
+	{
+		print("glyph at \(x), \(y): fg: \(glyphInfo.pointee.gm.tileidx), bg: \(backgroundGlyphInfo.pointee.gm.tileidx)")
+        guard let state = gameState,
+              x >= 0, x < Int32(GameState.mapCols),
+              y >= 0, y < Int32(GameState.mapRows) else { return }
+        let idx = Int(y) * GameState.mapCols + Int(x)
+        state.mapGlyphs[idx]   = glyphInfo.pointee
+        state.mapBkGlyphs[idx] = backgroundGlyphInfo.pointee
     }
 
     func clipAround(x: Int32, y: Int32) {

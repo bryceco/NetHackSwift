@@ -43,6 +43,29 @@ final class GameState {
     // Equipped items keyed by slot; missing key means the slot is empty
     var equipment: [NHEquipSlot: NHEquipItem] = [:]
 
+    // Map grid — ROWNO×COLNO, stored row-major; glyph.glyph == -1 means empty
+    static let mapRows = 21
+    static let mapCols = 80
+    // Ignored so that individual printGlyph writes don't trigger per-cell re-renders.
+    // MapView re-renders when mapVersion is incremented at displayWindow time.
+    @ObservationIgnored var mapGlyphs: [nhswift_glyph] = {
+        var empty = nhswift_glyph()
+        empty.glyph = -1
+        return Array(repeating: empty, count: 21 * 80)
+    }()
+    @ObservationIgnored var mapBkGlyphs: [nhswift_glyph] = {
+        var empty = nhswift_glyph()
+        empty.glyph = -1
+        return Array(repeating: empty, count: 21 * 80)
+    }()
+    var mapCursorX: Int32 = 0
+    var mapCursorY: Int32 = 0
+    // Incremented by displayWindow(.map) to trigger a single Canvas redraw per frame.
+    var mapVersion: Int = 0
+
+    // When true, MapView draws ttychar text instead of tile images.
+    var mapUsesTextDisplay: Bool = false
+
     var hpDisplay: String { "\(hp)(\(maxHp))" }
     var pwDisplay: String { "\(pw)(\(maxPw))" }
 }

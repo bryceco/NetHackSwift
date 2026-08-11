@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -45,6 +46,12 @@ struct NetHackSwiftApp: App {
 		Self.copyTo(playgroundURL: playgroundURL,
 					from: resourcesURL.appendingPathComponent("Playground"))
 		FileManager.default.changeCurrentDirectoryPath(resourcesURL.path)
+
+        if let tilesURL = Bundle.main.url(forResource: "nhtiles", withExtension: "png"),
+           let tilesImage = NSImage(contentsOf: tilesURL)
+		{
+            TileSet.shared = TileSet(image: tilesImage, tileSize: NSSize(width: 16, height: 16))
+        }
 
         let c = NetHackController()
         c.gameState = gameState

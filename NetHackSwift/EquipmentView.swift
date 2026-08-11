@@ -39,7 +39,14 @@ private struct SlotView: View {
                     RoundedRectangle(cornerRadius: 2)
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
-            // TODO: render item tile from item.glyph
+            if let item,
+			   let tileImage = TileSet.shared?.image(forGlyph: item.glyph)
+			{
+                Image(nsImage: tileImage)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: 32, height: 32)
+            }
         }
         .frame(width: 32, height: 32)
         .help(item?.name ?? "")
