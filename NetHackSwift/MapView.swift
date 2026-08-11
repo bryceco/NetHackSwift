@@ -27,6 +27,7 @@ struct MapView: View {
                 for row in 0..<GameState.mapRows {
                     for col in 0..<GameState.mapCols {
                         let idx = row * GameState.mapCols + col
+                        guard idx < glyphs.count else { continue }
                         let glyph   = glyphs[idx]
                         let bkGlyph = bkGlyphs[idx]
                         guard glyph.glyph >= 0 else { continue }
@@ -74,12 +75,46 @@ struct MapView: View {
                     .onEnded { value in
                         let col = Int32(value.location.x / tileW)
                         let row = Int32(value.location.y / tileH)
-                        controller.sendMouseClick(x: col, y: row, mod: 0)
+                        controller.sendMouseClick(x: col, y: row, mod: NHMouseButton.left.rawValue)
                     }
+            )
+            .overlay(
+                RightClickOverlay { location in
+                    let col = Int32(location.x / tileW)
+                    let row = Int32(location.y / tileH)
+                    controller.sendMouseClick(x: col, y: row, mod: NHMouseButton.right.rawValue)
+                }
             )
         }
         .background(Color(white: 0.21)) // charcoal gray for excess space
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Transparent overlay that captures right-click (secondary mouse button) events
+/// and reports the click location in its own coordinate space.
+private struct RightClickOverlay: NSViewRepresentable {
+    let onRightClick: (CGPoint) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = RightClickView()
+        view.onRightClick = onRightClick
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? RightClickView)?.onRightClick = onRightClick
+    }
+
+    private class RightClickView: NSView {
+        var onRightClick: ((CGPoint) -> Void)?
+
+        override func rightMouseUp(with event: NSEvent) {
+            let location = convert(event.locationInWindow, from: nil)
+            // Flip from AppKit (origin bottom-left) to SwiftUI (origin top-left).
+            let flipped = CGPoint(x: location.x, y: bounds.height - location.y)
+            onRightClick?(flipped)
+        }
     }
 }
 

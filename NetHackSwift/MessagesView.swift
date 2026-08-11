@@ -4,16 +4,24 @@ struct MessagesView: View {
     let messages: [String]
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
-                    Text(message)
-                        .font(.system(size: 13))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
+                        Text(message)
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(index)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+            }
+            .onChange(of: messages.count) {
+                if let last = messages.indices.last {
+                    proxy.scrollTo(last, anchor: .bottom)
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
         }
         .background(Color(nsColor: .textBackgroundColor))
         .overlay(alignment: .leading) {

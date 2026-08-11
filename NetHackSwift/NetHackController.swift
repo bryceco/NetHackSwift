@@ -70,6 +70,9 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyCompletion: ((Int32) -> Void)?
     @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
+    @ObservationIgnored private var pendingYnCompletion: ((Int32) -> Void)?
+    @ObservationIgnored private var pendingYnResponses: String = ""
+    @ObservationIgnored private var pendingYnDefault: Int32 = 0
 
     // Retained token for the global key-down event monitor.
     @ObservationIgnored private var keyEventMonitor: Any?
@@ -88,33 +91,52 @@ private struct NHMenuItem {
     var isInitialized = false
 
     override init() {
-        let isPreview = getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false
+        let isPreview = getenv("XCODE_RUNNING_FOR_PREVIEWS") != nil
+                     || (getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false)
         bridge = isPreview ? nil : NetHackBridge()
         super.init()
         // Install a persistent local key-down monitor. Events are consumed only
         // when NetHack is blocking for input; all others pass through unchanged.
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self,
-                  self.pendingKeyCompletion != nil || self.pendingKeyOrMouseCompletion != nil
-            else { return event }
+                  self.pendingKeyCompletion != nil
+					|| self.pendingKeyOrMouseCompletion != nil
+					|| self.pendingYnCompletion != nil
+            else {
+				return event
+			}
             self.sendKey(Self.keyCode(from: event))
             return nil  // consume the event
         }
     }
 
     /// Translates a key-down NSEvent into the character code NetHack expects.
-    /// Arrow keys are mapped to vi-motion characters; everything else uses the
-    /// character value with modifiers applied (so Ctrl+C → 3, etc.).
+    /// Arrow keys map to vi-motion characters; Shift uppercases them (run mode).
+    /// For other keys the system-provided character is used when available
+    /// (it already encodes Ctrl, so Ctrl+C → 3, Shift+a → A, etc.).
+    /// When the system returns nothing (some Ctrl combos are intercepted by macOS),
+    /// the control character is computed directly: Ctrl+key = key & 0x1F.
     private static func keyCode(from event: NSEvent) -> Int32 {
+        let flags = event.modifierFlags
+        let shift = flags.contains(.shift)
         switch Int(event.keyCode) {
-        case 126: return Int32(UInt8(ascii: "k"))   // ↑
-        case 125: return Int32(UInt8(ascii: "j"))   // ↓
-        case 123: return Int32(UInt8(ascii: "h"))   // ←
-        case 124: return Int32(UInt8(ascii: "l"))   // →
+        case 126: return shift ? Int32(UInt8(ascii: "K")) : Int32(UInt8(ascii: "k"))   // ↑
+        case 125: return shift ? Int32(UInt8(ascii: "J")) : Int32(UInt8(ascii: "j"))   // ↓
+        case 123: return shift ? Int32(UInt8(ascii: "H")) : Int32(UInt8(ascii: "h"))   // ←
+        case 124: return shift ? Int32(UInt8(ascii: "L")) : Int32(UInt8(ascii: "l"))   // →
         default:  break
         }
-        if let scalar = event.characters?.unicodeScalars.first, scalar.value < 128 {
+        // Use the system-translated character if the OS gave us one.
+        if let scalar = event.characters?.unicodeScalars.first, scalar.value > 0, scalar.value < 128 {
             return Int32(scalar.value)
+        }
+        // Fallback: macOS intercepted the key before we could read it (common for
+        // some Ctrl combos). Compute the control character from the bare key.
+        if flags.contains(.control),
+           let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
+           scalar.value >= 64, scalar.value < 128
+        {
+            return Int32(scalar.value) & 0x1F
         }
         return 0
     }
@@ -133,6 +155,20 @@ private struct NHMenuItem {
 
     /// Forward a keypress to whichever blocking key-input request is pending.
     func sendKey(_ key: Int32) {
+        if let completion = pendingYnCompletion {
+            // Enter accepts the default; any character in the responses string is accepted.
+            if key == 13 || key == 10 {
+                pendingYnCompletion = nil
+                completion(pendingYnDefault)
+            } else if let scalar = Unicode.Scalar(UInt32(key)),
+                      pendingYnResponses.unicodeScalars.contains(scalar)
+			{
+                pendingYnCompletion = nil
+                completion(key)
+            }
+            // Any other key is silently ignored; NetHack keeps waiting.
+            return
+        }
         if let completion = pendingKeyCompletion {
             pendingKeyCompletion = nil
             completion(key)
@@ -446,6 +482,13 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func needsKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
         pendingKeyOrMouseCompletion = completion
+    }
+
+    func needsYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
+        print("yn_function: \(query) [\(responses)]")
+        pendingYnResponses = responses
+        pendingYnDefault = defaultResponse
+        pendingYnCompletion = completion
     }
 
     func selectMenu(in window: NHWindowID,
