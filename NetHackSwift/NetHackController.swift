@@ -27,6 +27,11 @@ private final class NHWindowData {
     let type: NHWindowType
     var strings: [String] = []
 
+    /// Set when clearNhwindow fires on the message window. The next putString
+    /// will insert a "-----" delimiter before its content, then clear this flag.
+    /// Multiple consecutive clears still produce only one delimiter.
+    var pendingClear: Bool = false
+
     // Menu-specific fields, populated by start_menu / add_menu / end_menu.
     var menuTitle: String = ""
     var menuBehavior: UInt = 0
@@ -66,6 +71,9 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
 
+    // Retained token for the global key-down event monitor.
+    @ObservationIgnored private var keyEventMonitor: Any?
+
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
 
@@ -83,6 +91,32 @@ private struct NHMenuItem {
         let isPreview = getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false
         bridge = isPreview ? nil : NetHackBridge()
         super.init()
+        // Install a persistent local key-down monitor. Events are consumed only
+        // when NetHack is blocking for input; all others pass through unchanged.
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  self.pendingKeyCompletion != nil || self.pendingKeyOrMouseCompletion != nil
+            else { return event }
+            self.sendKey(Self.keyCode(from: event))
+            return nil  // consume the event
+        }
+    }
+
+    /// Translates a key-down NSEvent into the character code NetHack expects.
+    /// Arrow keys are mapped to vi-motion characters; everything else uses the
+    /// character value with modifiers applied (so Ctrl+C → 3, etc.).
+    private static func keyCode(from event: NSEvent) -> Int32 {
+        switch Int(event.keyCode) {
+        case 126: return Int32(UInt8(ascii: "k"))   // ↑
+        case 125: return Int32(UInt8(ascii: "j"))   // ↓
+        case 123: return Int32(UInt8(ascii: "h"))   // ←
+        case 124: return Int32(UInt8(ascii: "l"))   // →
+        default:  break
+        }
+        if let scalar = event.characters?.unicodeScalars.first, scalar.value < 128 {
+            return Int32(scalar.value)
+        }
+        return 0
     }
 
     func start(playgroundURL: URL,
@@ -127,6 +161,22 @@ private struct NHMenuItem {
 
 extension NetHackController: NetHackBridgeDelegate {
 
+	private func windowName(for window: NHWindowID) -> String {
+		guard let data = pendingWindows[window] else {
+			return "undefined"
+		}
+
+		switch data.type {
+		case .message: return "Message"
+		case .status: return "Status"
+		case .map: return "Map"
+		case .menu: return "Menu"
+		case .text: return "Text"
+		@unknown default:
+			fatalError()
+		}
+	}
+
     func rawPrint(_ string: String) {
         print(string)
     }
@@ -136,6 +186,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
+		print("moveCursor")
         if pendingWindows[window]?.type == .map {
             gameState?.mapCursorX = x
             gameState?.mapCursorY = y
@@ -143,10 +194,29 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
-        if let data = pendingWindows[window] {
-            data.strings.append(string)
-        } else {
+		print("putString \(windowName(for: window)): \(string)")
+        guard let data = pendingWindows[window] else {
             print(string)
+            return
+        }
+        switch data.type {
+        case .message:
+            // Message window is always visible; append immediately rather than
+            // waiting for displayNhwindow, which may not be called for this type.
+            if data.pendingClear {
+                data.pendingClear = false
+                if !(gameState?.messages.isEmpty ?? true) {
+                    gameState?.messages.append("-----")
+                }
+            }
+            gameState?.messages.append(string)
+        case .status:
+            // Status content arrives via updateStatusField; putString on the
+            // status window is not expected, but log it rather than silently drop.
+            print("status putString (unexpected): \(string)")
+        default:
+            // Text and menu windows accumulate strings until displayNhwindow.
+            data.strings.append(string)
         }
     }
 
@@ -158,12 +228,19 @@ extension NetHackController: NetHackBridgeDelegate {
 	}
 
     func clearNhwindow(_ window: NHWindowID) {
+		print("clearNhwindow \(windowName(for: window))")
+		if pendingWindows[window]?.type == .message {
+			pendingWindows[window]?.pendingClear = true
+			return
+		}
         // Reset accumulated data so the window can be reused for new content.
         pendingWindows[window]!.strings = []
         pendingWindows[window]!.resetMenu()
+		#if false
         // Close the displayed window if it was already shown.
         nhWindows[window]?.close()
         nhWindows.removeValue(forKey: window)
+		#endif
     }
 
 	func displayNhwindow(_ window: NHWindowID, blocking: Bool) {
@@ -171,8 +248,8 @@ extension NetHackController: NetHackBridgeDelegate {
 
         switch data.type {
         case .message:
-            // NHW_MESSAGE is the top-line message log — append to the scrolling message list.
-            gameState?.messages.append(contentsOf: data.strings)
+            // Strings were already forwarded to gameState.messages in putString; nothing to flush.
+            break
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
             let hasTitle = !data.menuTitle.isEmpty
@@ -213,7 +290,7 @@ extension NetHackController: NetHackBridgeDelegate {
 		case .status:
 			print("display status")
 			break
-			default:
+		default:
 			fatalError()
 		}
     }

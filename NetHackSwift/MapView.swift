@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MapView: View {
     @Environment(GameState.self) private var gameState
+    @Environment(NetHackController.self) private var controller
 
     var body: some View {
         // Capture all game-state reads here so @Observable tracks them and
@@ -68,6 +69,14 @@ struct MapView: View {
             }
             .background(.black)
             .frame(width: mapWidth, height: mapHeight)
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        let col = Int32(value.location.x / tileW)
+                        let row = Int32(value.location.y / tileH)
+                        controller.sendMouseClick(x: col, y: row, mod: 0)
+                    }
+            )
         }
         .background(Color(white: 0.21)) // charcoal gray for excess space
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -77,5 +86,6 @@ struct MapView: View {
 #Preview {
     MapView()
         .environment(GameState())
+        .environment(NetHackController())
         .frame(width: 637, height: 216)
 }
