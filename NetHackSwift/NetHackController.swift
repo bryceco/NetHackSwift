@@ -472,19 +472,19 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Blocking input
 
-    func needsLineInput(_ prompt: String, completion: @escaping (String?) -> Void) {
+    func needLineInput(_ prompt: String, completion: @escaping (String?) -> Void) {
         pendingLineCompletion = completion
     }
 
-    func needsKeyInput(_ completion: @escaping (Int32) -> Void) {
+    func needKeyInput(_ completion: @escaping (Int32) -> Void) {
         pendingKeyCompletion = completion
     }
 
-    func needsKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
+    func needKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
         pendingKeyOrMouseCompletion = completion
     }
 
-    func needsYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
+    func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
         print("yn_function: \(query) [\(responses)]")
         pendingYnResponses = responses
         pendingYnDefault = defaultResponse
