@@ -45,7 +45,7 @@ private struct SlotView: View {
                 Image(nsImage: tileImage)
                     .resizable()
                     .interpolation(.none)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
             }
         }
         .frame(width: 32, height: 32)
