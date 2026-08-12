@@ -76,6 +76,10 @@ private struct NHMenuItem {
     @ObservationIgnored private var keyEventMonitor: Any?
     // Set when Cmd-Q triggers a save-and-quit; auto-confirms the "Really save?" prompt.
     @ObservationIgnored private var isSavingAndQuitting = false
+    // Direction keys currently held (key codes 123–126). Both sets are cleared at
+    // the start of each blocking input call so stale state never carries over.
+    @ObservationIgnored private var pressedDirectionKeys: Set<Int> = []
+    @ObservationIgnored private var pendingDirectionKeys: Set<Int> = []
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -95,46 +99,90 @@ private struct NHMenuItem {
                      || (getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false)
         bridge = isPreview ? nil : NetHackBridge()
         super.init()
-        // Install a persistent local key-down monitor. Events are consumed only
-        // when NetHack is blocking for input; all others pass through unchanged.
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        // Install a persistent monitor for key-down and key-up events.
+        // Events are consumed only when NetHack is blocking for input.
+        // Arrow keys are held until key-up so simultaneous presses can be
+        // resolved into diagonal vi-motion characters (chords).
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
             guard let self,
                   self.pendingKeyCompletion != nil
-					|| self.pendingKeyOrMouseCompletion != nil
+                      || self.pendingKeyOrMouseCompletion != nil
             else {
-				return event
-			}
-            // Cmd-Q: ask NetHack to save, then auto-confirm and terminate.
-            if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-               event.characters == "q"
-			{
-                self.isSavingAndQuitting = true
-                self.sendKey(Int32(UInt8(ascii: "S")))
+                return event
+            }
+
+            let keyCode = Int(event.keyCode)
+            let isArrow = Self.arrowKeyCodes.contains(keyCode)
+
+            if event.type == .keyDown {
+                // Cmd-Q: ask NetHack to save, then auto-confirm and terminate.
+                if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                   event.characters == "q"
+                {
+                    self.isSavingAndQuitting = true
+                    self.sendKey(Int32(UInt8(ascii: "S")))
+                    return nil
+                }
+                // Let other Command-key shortcuts (Cmd-H, Cmd-W, …) reach the app menu.
+                if event.modifierFlags.contains(.command) { return event }
+
+                if isArrow {
+                    // Accumulate arrow keys; resolve the chord on key-up.
+                    self.pressedDirectionKeys.insert(keyCode)
+                    self.pendingDirectionKeys.insert(keyCode)
+                } else {
+                    self.sendKey(Self.keyCode(from: event))
+                }
+                return nil  // consume
+
+            } else {  // .keyUp
+                if isArrow {
+                    if self.pendingDirectionKeys.contains(keyCode) {
+                        // First key-up of this chord — resolve and send.
+                        let shift = event.modifierFlags.contains(.shift)
+                        let ch = Self.chordCharacter(keys: self.pendingDirectionKeys, shift: shift)
+                        self.pendingDirectionKeys.removeAll()
+                        self.sendKey(ch)
+                    }
+                    self.pressedDirectionKeys.remove(keyCode)
+                }
                 return nil
             }
-            // Let other Command-key shortcuts (Cmd-H, Cmd-W, …) reach the app menu.
-            if event.modifierFlags.contains(.command) { return event }
-            self.sendKey(Self.keyCode(from: event))
-            return nil  // consume the event
         }
     }
 
-    /// Translates a key-down NSEvent into the character code NetHack expects.
-    /// Arrow keys map to vi-motion characters; Shift uppercases them (run mode).
-    /// For other keys the system-provided character is used when available
-    /// (it already encodes Ctrl, so Ctrl+C → 3, Shift+a → A, etc.).
-    /// When the system returns nothing (some Ctrl combos are intercepted by macOS),
-    /// the control character is computed directly: Ctrl+key = key & 0x1F.
+    /// Arrow key codes on macOS (left=123, right=124, down=125, up=126).
+    private static let arrowKeyCodes: Set<Int> = [123, 124, 125, 126]
+
+    /// Resolves a set of simultaneously-pressed arrow key codes into a single
+    /// vi-motion character. Diagonal chords (e.g. left+down) map to the
+    /// corresponding intercardinal direction. Shift uppercases for run mode.
+    private static func chordCharacter(keys: Set<Int>, shift: Bool) -> Int32 {
+        let up    = keys.contains(126)
+        let down  = keys.contains(125)
+        let left  = keys.contains(123)
+        let right = keys.contains(124)
+        let ascii: UInt8
+        switch (up, down, left, right) {
+        case (true,  _,     true,  _    ): ascii = shift ? 89 : 121  // Y/y northwest
+        case (true,  _,     _,     true ): ascii = shift ? 85 : 117  // U/u northeast
+        case (_,     true,  true,  _    ): ascii = shift ? 66 : 98   // B/b southwest
+        case (_,     true,  _,     true ): ascii = shift ? 78 : 110  // N/n southeast
+        case (true,  _,     _,     _    ): ascii = shift ? 75 : 107  // K/k north
+        case (_,     true,  _,     _    ): ascii = shift ? 74 : 106  // J/j south
+        case (_,     _,     true,  _    ): ascii = shift ? 72 : 104  // H/h west
+        case (_,     _,     _,     true ): ascii = shift ? 76 : 108  // L/l east
+        default:                           return 0
+        }
+        return Int32(ascii)
+    }
+
+    /// Translates a non-arrow key-down NSEvent into the character code NetHack expects.
+    /// Arrow keys are handled separately via chord detection; this is never called for them.
+    /// The system-provided character already encodes modifiers (Ctrl+C → 3, etc.).
+    /// When macOS intercepts a Ctrl combo before we see it, compute it directly.
     private static func keyCode(from event: NSEvent) -> Int32 {
         let flags = event.modifierFlags
-        let shift = flags.contains(.shift)
-        switch Int(event.keyCode) {
-        case 126: return shift ? Int32(UInt8(ascii: "K")) : Int32(UInt8(ascii: "k"))   // ↑
-        case 125: return shift ? Int32(UInt8(ascii: "J")) : Int32(UInt8(ascii: "j"))   // ↓
-        case 123: return shift ? Int32(UInt8(ascii: "H")) : Int32(UInt8(ascii: "h"))   // ←
-        case 124: return shift ? Int32(UInt8(ascii: "L")) : Int32(UInt8(ascii: "l"))   // →
-        default:  break
-        }
         // Use the system-translated character if the OS gave us one.
         if let scalar = event.characters?.unicodeScalars.first, scalar.value > 0, scalar.value < 128 {
             return Int32(scalar.value)
@@ -484,10 +532,14 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func needKeyInput(_ completion: @escaping (Int32) -> Void) {
+        pressedDirectionKeys.removeAll()
+        pendingDirectionKeys.removeAll()
         pendingKeyCompletion = completion
     }
 
     func needKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
+        pressedDirectionKeys.removeAll()
+        pendingDirectionKeys.removeAll()
         pendingKeyOrMouseCompletion = completion
     }
 
