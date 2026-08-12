@@ -34,17 +34,15 @@ struct NetHackSwiftApp: App {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
                                                   in: .userDomainMask)[0]
         let playgroundURL = appSupport.appendingPathComponent("NetHack", isDirectory: true)
-#if true
-        try? FileManager.default.removeItem(at: playgroundURL)
-#endif
-        try? FileManager.default.createDirectory(at: playgroundURL,
-                                                 withIntermediateDirectories: true)
-
-		// Copy initial writable game files (livelog, logfile, etc.) on first run.
-		// nhdat and sysconf live in Resources/ and are never copied — NetHack
-		// reads them read-only directly from the app bundle.
-		Self.copyTo(playgroundURL: playgroundURL,
-					from: resourcesURL.appendingPathComponent("Playground"))
+        let isNewPlayground = !FileManager.default.fileExists(atPath: playgroundURL.path)
+        try? FileManager.default.createDirectory(at: playgroundURL, withIntermediateDirectories: true)
+        if isNewPlayground {
+            // Copy initial writable game files (livelog, logfile, perm, etc.) on first run.
+            // nhdat and sysconf live in Resources/ and are never copied — NetHack
+            // reads them read-only directly from the app bundle.
+            Self.copyTo(playgroundURL: playgroundURL,
+                        from: resourcesURL.appendingPathComponent("Playground"))
+        }
 		FileManager.default.changeCurrentDirectoryPath(resourcesURL.path)
 
         if let tilesURL = Bundle.main.url(forResource: "nhtiles", withExtension: "png"),
