@@ -454,19 +454,27 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func initStatus() {
-        // TODO: perform any status-bar setup
+        // nothing to do
     }
 
     func exitWindows(withMessage message: String?) {
-        print("exit_nhwindows: \(message ?? "")")
+		guard let message else {
+			return
+		}
+		guard let messageWin = pendingWindows.first(where: { (k,v) in v.type == .message })?.key else {
+			rawPrint(message)
+			return
+		}
+		self.putString(in: messageWin, string: message, attribute: .none)
+        print("exit_nhwindows: \(message)")
     }
 
     func suspendWindows(withMessage message: String?) {
-        // TODO: suspend UI
+        // not supported
     }
 
     func resumeWindows() {
-        // TODO: resume UI
+        // not supported
     }
 
     // MARK: Blocking input
@@ -516,7 +524,9 @@ extension NetHackController: NetHackBridgeDelegate {
         // Cancel (ESC and close button) is only supported when 'q' is a valid response.
         let cancelValue: Int32 = items.contains("q") ? Int32(UInt8(ascii: "q")) : 0
         var styleMask: NSWindow.StyleMask = [.titled, .utilityWindow]
-        if cancelValue != 0 { styleMask.insert(.closable) }
+        if cancelValue != 0 {
+			styleMask.insert(.closable)
+		}
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
             styleMask: styleMask,
@@ -575,9 +585,12 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     /// Removes the first `[…]` bracketed substring from `text`, trimming whitespace.
+	/// Skip if there are multiple bracketed items.
     private static func strippingBracketedContent(_ text: String) -> String {
-        guard let open = text.firstIndex(of: "["),
-              let close = text[open...].firstIndex(of: "]")
+        guard
+			text.count(where: { $0 == "[" }) == 1,
+			let open = text.firstIndex(of: "["),
+			let close = text[open...].firstIndex(of: "]")
         else { return text }
         var result = text
         result.removeSubrange(open...close)

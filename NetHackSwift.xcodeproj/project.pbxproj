@@ -14,6 +14,7 @@
 		02F578A53026652400F06F02 /* Playground in Resources */ = {isa = PBXBuildFile; fileRef = 02F578A43026652400F06F02 /* Playground */; };
 		02F7FEFB302A8E090071CDB0 /* nhtiles.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FEFA302A8E090071CDB0 /* nhtiles.png */; };
 		02F7FF25302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */; };
+		02F7FF42302CF33C0071CDB0 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 02F7FF41302CF33C0071CDB0 /* libz.tbd */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		02F578A43026652400F06F02 /* Playground */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Playground; path = NetHackSwift/Playground; sourceTree = "<group>"; };
 		02F7FEFA302A8E090071CDB0 /* nhtiles.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = nhtiles.png; sourceTree = "<group>"; };
 		02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Nevanda_5.0.0_32x32.png; sourceTree = "<group>"; };
+		02F7FF41302CF33C0071CDB0 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -56,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02F7FF42302CF33C0071CDB0 /* libz.tbd in Frameworks */,
 				02B20D52302547EB00C01E3E /* libnh.a in Frameworks */,
 				02F5766330254F8800F06F02 /* NetHackSwiftLib in Frameworks */,
 			);
@@ -97,6 +100,7 @@
 		02D2DB343025420E00CB39E5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				02F7FF41302CF33C0071CDB0 /* libz.tbd */,
 				02B20D51302547EB00C01E3E /* libnh.a */,
 			);
 			name = Frameworks;
