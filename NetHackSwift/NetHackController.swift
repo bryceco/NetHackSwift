@@ -496,10 +496,14 @@ extension NetHackController: NetHackBridgeDelegate {
             return
         }
 
-        // Strip any embedded "[choices]" from the question before displaying it.
-        let displayQuestion = Self.strippingBracketedContent(query)
-
         let (items, specials) = YesNoWindowView.parseYnChoices(responses)
+
+        // For known sequences the button labels are self-explanatory, so strip the
+        // embedded "[y/n/…]" hint from the question. For unknown sequences keep it —
+        // the brackets are the only indication of what each character means.
+        let displayQuestion = YesNoWindowView.knownLabels[items] != nil
+            ? Self.strippingBracketedContent(query)
+            : query
 
         // Multi-item list with '?' option: let NetHack show its own comprehensive list.
         if specials.contains("?") && items.count > 1 {

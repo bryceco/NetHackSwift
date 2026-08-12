@@ -124,19 +124,20 @@ extension YesNoWindowView {
 
     /// Converts the inventory-letter portion of a NetHack choices string into
     /// labeled button tuples.
+    /// Maps well-known response sequences to friendly button labels.
+    /// Unrecognised sequences show the character itself (e.g. 'r' → "R").
+    static let knownLabels: [String: [Character: String]] = [
+        "yn":  ["y": "Yes", "n": "No"],
+        "ynq": ["y": "Yes", "n": "No", "q": "Quit"],
+        "lr":  ["r": "Right", "l": "Left"],
+    ]
+
     static func makeButtons(from responses: String) -> [(label: String, value: Int32)] {
         let (items, _) = parseYnChoices(responses)
+        let labelMap = knownLabels[items] ?? [:]
         return items.unicodeScalars.map { scalar in
             let char = Character(scalar)
-            let label: String
-            switch char {
-            case "y": label = "Yes"
-            case "n": label = "No"
-            case "q": label = "Quit"
-            case "r": label = "Right"
-            case "l": label = "Left"
-            default:  label = String(char).uppercased()
-            }
+            let label = labelMap[char] ?? String(char).uppercased()
             return (label: label, value: Int32(scalar.value))
         }
     }
