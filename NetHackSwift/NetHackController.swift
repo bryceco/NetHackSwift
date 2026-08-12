@@ -488,21 +488,22 @@ extension NetHackController: NetHackBridgeDelegate {
             return
         }
 
-        // "ynq" sends 'q' to cancel; all other choices cancel with ESC.
-        let cancelValue: Int32 = responses == "ynq" ? Int32(UInt8(ascii: "q")) : asciiESC
-
         // Show a Yes/No panel for simple choices like "yn", "ynq", "rl".
         let buttons = YesNoWindowView.makeButtons(from: responses)
+        // Cancel (ESC and close button) is only supported when 'q' is a valid response.
+        let cancelValue: Int32 = items.contains("q") ? Int32(UInt8(ascii: "q")) : 0
+        var styleMask: NSWindow.StyleMask = [.titled, .utilityWindow]
+        if cancelValue != 0 { styleMask.insert(.closable) }
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
-            styleMask: [.titled, .closable, .utilityWindow],
+            styleMask: styleMask,
             backing: .buffered,
             defer: false
         )
         panel.animationBehavior = .none
         panel.isRestorable = false
         panel.isReleasedWhenClosed = false
-        var result = cancelValue
+        var result: Int32 = cancelValue
         let view = YesNoWindowView(
             question: displayQuestion,
             buttons: buttons,
@@ -653,7 +654,7 @@ private struct DirectionModalView: View {
         default: break
         }
         guard let char = press.characters.first else { return nil }
-        if char == "\u{1B}" { return asciiESC }
+        if char.asciiValue == UInt8(asciiESC) { return asciiESC }
         let valid = Set<Character>("yYkKuUhHlLbBjJnN<>.")
         return valid.contains(char) ? Int32(char.asciiValue ?? 0) : nil
     }

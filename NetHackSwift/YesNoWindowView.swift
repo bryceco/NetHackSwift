@@ -7,7 +7,7 @@ struct YesNoWindowView: View {
     // Each tuple: (display label, response character as Int32)
     let buttons: [(label: String, value: Int32)]
     let defaultValue: Int32
-    let cancelValue: Int32  // sent on Escape or window close
+    let cancelValue: Int32  // sent on Escape or window close; 0 = no cancel supported
     var onSelect: (Int32) -> Void
 
     @FocusState private var isFocused: Bool
@@ -43,9 +43,9 @@ struct YesNoWindowView: View {
         .onAppear { isFocused = true }
         .onKeyPress { press in
             guard let char = press.characters.first else { return .ignored }
-            // Escape cancels.
-            if char == "\u{1B}" {
-                onSelect(cancelValue)
+            // Escape cancels, but only if a cancel value is defined.
+            if char.asciiValue == UInt8(asciiESC) {
+                if cancelValue != 0 { onSelect(cancelValue) }
                 return .handled
             }
             // Enter accepts the default.
@@ -149,7 +149,7 @@ extension YesNoWindowView {
         question: "Do you want to eat the food?",
         buttons: YesNoWindowView.makeButtons(from: "yn"),
         defaultValue: Int32(UInt8(ascii: "n")),
-        cancelValue: asciiESC,
+        cancelValue: 0,
         onSelect: { _ in }
     )
 }
