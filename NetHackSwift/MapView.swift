@@ -23,74 +23,69 @@ struct MapView: View {
         let mapWidth     = CGFloat(GameState.mapCols) * tileW
         let mapHeight    = CGFloat(GameState.mapRows) * tileH
 
-        ScrollViewReader { scrollProxy in
-            ScrollView([.horizontal, .vertical]) {
-                Canvas { context, _ in
-                    for row in 0..<GameState.mapRows {
-                        for col in 0..<GameState.mapCols {
-                            let idx = row * GameState.mapCols + col
-                            guard idx < glyphs.count else { continue }
-                            let glyph   = glyphs[idx]
-                            let bkGlyph = bkGlyphs[idx]
-                            guard glyph.glyph >= 0 else { continue }
+        ScrollView([.horizontal, .vertical]) {
+            Canvas { context, _ in
+                for row in 0..<GameState.mapRows {
+                    for col in 0..<GameState.mapCols {
+                        let idx = row * GameState.mapCols + col
+                        guard idx < glyphs.count else { continue }
+                        let glyph   = glyphs[idx]
+                        let bkGlyph = bkGlyphs[idx]
+                        guard glyph.glyph >= 0 else { continue }
 
-                            let dest = CGRect(x: CGFloat(col) * tileW,
-                                             y: CGFloat(row) * tileH,
-                                             width: tileW, height: tileH)
+                        let dest = CGRect(x: CGFloat(col) * tileW,
+                                         y: CGFloat(row) * tileH,
+                                         width: tileW, height: tileH)
 
-                            if useText {
-                                if let scalar = Unicode.Scalar(UInt32(glyph.ttychar)), scalar.value > 0 {
-                                    let ch = Text(String(scalar))
-                                        .font(.system(size: tileH * 0.75).monospaced())
-                                        .foregroundStyle(.white)
-                                    context.draw(ch, in: dest)
-                                }
-                            } else if let tileSet {
-                                // Draw background tile first, then foreground on top.
-                                if bkGlyph.glyph >= 0,
-                                   let bkTile = tileSet.image(forGlyph: bkGlyph)
-                                {
-                                    context.draw(Image(nsImage: bkTile), in: dest)
-                                }
-                                if let tile = tileSet.image(forGlyph: glyph) {
-                                    context.draw(Image(nsImage: tile), in: dest)
-                                }
+                        if useText {
+                            if let scalar = Unicode.Scalar(UInt32(glyph.ttychar)), scalar.value > 0 {
+                                let ch = Text(String(scalar))
+                                    .font(.system(size: tileH * 0.75).monospaced())
+                                    .foregroundStyle(.white)
+                                context.draw(ch, in: dest)
+                            }
+                        } else if let tileSet {
+                            // Draw background tile first, then foreground on top.
+                            if bkGlyph.glyph >= 0,
+                               let bkTile = tileSet.image(forGlyph: bkGlyph)
+                            {
+                                context.draw(Image(nsImage: bkTile), in: dest)
+                            }
+                            if let tile = tileSet.image(forGlyph: glyph) {
+                                context.draw(Image(nsImage: tile), in: dest)
                             }
                         }
                     }
+                }
 
-                    // Cursor rectangle, color-coded by remaining HP.
-                    let cursorRect = CGRect(x: CGFloat(cursorX) * tileW,
-                                            y: CGFloat(cursorY) * tileH,
-                                            width: tileW, height: tileH)
-                    let cursorColor: Color = hpPercent > 75
-                        ? .green.opacity(0.9)
-                        : hpPercent > 50
-                            ? Color(red: 0.8, green: 0.8, blue: 0).opacity(0.9)
-                            : Color(red: 0.8, green: 0,   blue: 0).opacity(0.9)
-                    context.stroke(Path(cursorRect), with: .color(cursorColor))
+                // Cursor rectangle, color-coded by remaining HP.
+                let cursorRect = CGRect(x: CGFloat(cursorX) * tileW,
+                                        y: CGFloat(cursorY) * tileH,
+                                        width: tileW, height: tileH)
+                let cursorColor: Color = hpPercent > 75
+                    ? .green.opacity(0.9)
+                    : hpPercent > 50
+                        ? Color(red: 0.8, green: 0.8, blue: 0).opacity(0.9)
+                        : Color(red: 0.8, green: 0,   blue: 0).opacity(0.9)
+                context.stroke(Path(cursorRect), with: .color(cursorColor))
+            }
+            .background(.black)
+            .frame(width: mapWidth, height: mapHeight)
+            .overlay(
+                MouseClickOverlay { location, button in
+                    let col = Int32(location.x / tileW)
+                    let row = Int32(location.y / tileH)
+                    controller.sendMouseClick(x: col, y: row, mod: button.rawValue)
                 }
-                .background(.black)
-                .frame(width: mapWidth, height: mapHeight)
-                // Invisible anchor at the clipAround position; scrollTo targets this view.
-                .overlay(alignment: .topLeading) {
-                    Color.clear
-                        .frame(width: tileW, height: tileH)
-                        .position(x: CGFloat(clipX) * tileW + tileW / 2,
-                                  y: CGFloat(clipY) * tileH + tileH / 2)
-                        .id("clipAround")
-                }
-                .overlay(
-                    MouseClickOverlay { location, button in
-                        let col = Int32(location.x / tileW)
-                        let row = Int32(location.y / tileH)
-                        controller.sendMouseClick(x: col, y: row, mod: button.rawValue)
-                    }
+            )
+            // Invisible view that triggers NSScrollView scrolling when clipAroundVersion changes.
+            .background(
+                ClipAroundScroller(
+                    version: clipVersion,
+                    tileX: clipX, tileY: clipY,
+                    tileW: tileW, tileH: tileH
                 )
-            }
-            .onChange(of: clipVersion) {
-                scrollProxy.scrollTo("clipAround", anchor: .center)
-            }
+            )
         }
         .background(Color(white: 0.21)) // charcoal gray for excess space
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,6 +123,60 @@ private struct MouseClickOverlay: NSViewRepresentable {
         override func rightMouseUp(with event: NSEvent) {
             onClick?(flipped(event), .right)
         }
+    }
+}
+
+/// Invisible NSViewRepresentable that scrolls the enclosing NSScrollView so that
+/// the tile at (tileX, tileY) is visible, centered if possible. It walks up the
+/// view hierarchy to find the NSScrollView, avoiding SwiftUI ScrollViewProxy
+/// reliability issues on macOS.
+private struct ClipAroundScroller: NSViewRepresentable {
+    let version: Int
+    let tileX: Int32
+    let tileY: Int32
+    let tileW: CGFloat
+    let tileH: CGFloat
+
+    func makeNSView(context: Context) -> NSView {
+        let view = ScrollTriggerView()
+        view.isHidden = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let trigger = nsView as? ScrollTriggerView,
+              trigger.lastVersion != version else { return }
+        trigger.lastVersion = version
+
+        // Walk up the hierarchy to find the NSScrollView.
+        var current: NSView? = nsView
+        while let v = current {
+            if let scrollView = v as? NSScrollView {
+                let rect = CGRect(
+                    x: CGFloat(tileX) * tileW,
+                    y: CGFloat(tileY) * tileH,
+                    width: tileW,
+                    height: tileH
+                )
+                // Center the target rect in the visible area.
+                let visible = scrollView.contentView.bounds.size
+                let centeredOrigin = CGPoint(
+                    x: rect.midX - visible.width  / 2,
+                    y: rect.midY - visible.height / 2
+                )
+                let contentSize = scrollView.documentView?.bounds.size ?? .zero
+                let clampedX = max(0, min(centeredOrigin.x, contentSize.width  - visible.width))
+                let clampedY = max(0, min(centeredOrigin.y, contentSize.height - visible.height))
+                scrollView.contentView.scroll(to: CGPoint(x: clampedX, y: clampedY))
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+                return
+            }
+            current = v.superview
+        }
+    }
+
+    private class ScrollTriggerView: NSView {
+        var lastVersion: Int = -1
     }
 }
 
