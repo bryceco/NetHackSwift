@@ -80,7 +80,7 @@ private struct NHMenuItem {
     var gameState: GameState?
 
     /// Windows created by NetHack but not yet displayed (between createNhwindow and displayNhwindow).
-    @ObservationIgnored private var pendingWindows: [NHWindowID: NHWindowData] = [:]
+    @ObservationIgnored private var windowData: [NHWindowID: NHWindowData] = [:]
 
     /// NSWindows opened on behalf of NetHack, keyed by their NHWindowID.
     /// Kept to maintain a strong reference so the windows aren't deallocated.
@@ -152,7 +152,7 @@ private struct NHMenuItem {
 extension NetHackController: NetHackBridgeDelegate {
 
 	private func windowName(for window: NHWindowID) -> String {
-		guard let data = pendingWindows[window] else {
+		guard let data = windowData[window] else {
 			return "undefined"
 		}
 
@@ -176,7 +176,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
-		guard pendingWindows[window]?.type == .map else {
+		guard windowData[window]?.type == .map else {
 			print("bad moveCursor")
 			return
 		}
@@ -184,7 +184,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
-        guard let data = pendingWindows[window] else {
+        guard let data = windowData[window] else {
             print(string)
             return
         }
@@ -212,17 +212,17 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Window lifecycle
 
 	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
-		pendingWindows[window] = NHWindowData(type: type)
+		windowData[window] = NHWindowData(type: type)
 	}
 
     func clearNhwindow(_ window: NHWindowID) {
-		if pendingWindows[window]?.type == .message {
-			pendingWindows[window]?.pendingClear = true
+		if windowData[window]?.type == .message {
+			windowData[window]?.pendingClear = true
 			return
 		}
         // Reset accumulated data so the window can be reused for new content.
-        pendingWindows[window]!.strings = []
-        pendingWindows[window]!.resetMenu()
+        windowData[window]!.strings = []
+        windowData[window]!.resetMenu()
 		#if false
         // Close the displayed window if it was already shown.
         nhWindows[window]?.close()
@@ -231,7 +231,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
 	func displayNhwindow(_ window: NHWindowID, blocking: Bool) {
-		let data = pendingWindows[window]!
+		let data = windowData[window]!
 
         switch data.type {
         case .message:
@@ -285,7 +285,7 @@ extension NetHackController: NetHackBridgeDelegate {
     func destroyNhwindow(_ window: NHWindowID) {
         nhWindows[window]?.close()
         nhWindows.removeValue(forKey: window)
-        pendingWindows.removeValue(forKey: window)
+        windowData.removeValue(forKey: window)
     }
 
     // MARK: Text output
@@ -317,12 +317,12 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Menus
 
     func startMenu(in window: NHWindowID, behavior: UInt) {
-        pendingWindows[window]!.resetMenu()
-        pendingWindows[window]!.menuBehavior = behavior
+        windowData[window]!.resetMenu()
+        windowData[window]!.menuBehavior = behavior
     }
 
     func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UInt) {
-        pendingWindows[window]!.menuItems.append(NHMenuItem(
+        windowData[window]!.menuItems.append(NHMenuItem(
             accel: accel,
             groupAccel: groupAccel,
             attr: attr,
@@ -334,7 +334,7 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func endMenu(in window: NHWindowID, prompt: String?) {
-        pendingWindows[window]!.menuTitle = prompt ?? ""
+        windowData[window]!.menuTitle = prompt ?? ""
     }
 
     // MARK: Status bar
@@ -413,7 +413,7 @@ extension NetHackController: NetHackBridgeDelegate {
 		guard let message else {
 			return
 		}
-		guard let messageWin = pendingWindows.first(where: { (k,v) in v.type == .message })?.key else {
+		guard let messageWin = windowData.first(where: { (k,v) in v.type == .message })?.key else {
 			rawPrint(message)
 			return
 		}
@@ -572,7 +572,7 @@ extension NetHackController: NetHackBridgeDelegate {
                                 onAccept: (([MenuItemData]) -> Void)?,
                                 onCancel: (() -> Void)?)
 	{
-		let data = pendingWindows[window]!
+		let data = windowData[window]!
         let items = data.menuItems.map { item in
             MenuItemData(
                 key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
