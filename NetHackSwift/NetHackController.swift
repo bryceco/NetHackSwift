@@ -11,6 +11,8 @@ import Observation
 import SwiftUI
 import NetHackBridge
 
+private let asciiESC: Int32 = 27
+
 // MARK: - Keyable Panel
 
 /// NSPanel without a title bar can't become the key window by default.
@@ -70,10 +72,6 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyCompletion: ((Int32) -> Void)?
     @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
-    @ObservationIgnored private var pendingYnCompletion: ((Int32) -> Void)?
-    @ObservationIgnored private var pendingYnResponses: String = ""
-    @ObservationIgnored private var pendingYnDefault: Int32 = 0
-
     // Retained token for the global key-down event monitor.
     @ObservationIgnored private var keyEventMonitor: Any?
 
@@ -101,7 +99,6 @@ private struct NHMenuItem {
             guard let self,
                   self.pendingKeyCompletion != nil
 					|| self.pendingKeyOrMouseCompletion != nil
-					|| self.pendingYnCompletion != nil
             else {
 				return event
 			}
@@ -155,20 +152,6 @@ private struct NHMenuItem {
 
     /// Forward a keypress to whichever blocking key-input request is pending.
     func sendKey(_ key: Int32) {
-        if let completion = pendingYnCompletion {
-            // Enter accepts the default; any character in the responses string is accepted.
-            if key == 13 || key == 10 {
-                pendingYnCompletion = nil
-                completion(pendingYnDefault)
-            } else if let scalar = Unicode.Scalar(UInt32(key)),
-                      pendingYnResponses.unicodeScalars.contains(scalar)
-			{
-                pendingYnCompletion = nil
-                completion(key)
-            }
-            // Any other key is silently ignored; NetHack keeps waiting.
-            return
-        }
         if let completion = pendingKeyCompletion {
             pendingKeyCompletion = nil
             completion(key)
@@ -486,9 +469,88 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
         print("yn_function: \(query) [\(responses)]")
-        pendingYnResponses = responses
-        pendingYnDefault = defaultResponse
-        pendingYnCompletion = completion
+
+        // Direction questions get a dedicated direction-picker panel.
+		if responses.isEmpty && query.lowercased().contains("direction") {
+            showDirectionModal(completion: completion)
+            return
+        }
+
+        // Strip any embedded "[choices]" from the question before displaying it.
+        let displayQuestion = Self.strippingBracketedContent(query)
+
+        let (items, specials) = YesNoWindowView.parseYnChoices(responses)
+
+        // Multi-item list with '?' option: let NetHack show its own comprehensive list.
+        if specials.contains("?") && items.count > 1 {
+            completion(Int32(UInt8(ascii: "?")))
+            return
+        }
+
+        // "ynq" sends 'q' to cancel; all other choices cancel with ESC.
+        let cancelValue: Int32 = responses == "ynq" ? Int32(UInt8(ascii: "q")) : asciiESC
+
+        // Show a Yes/No panel for simple choices like "yn", "ynq", "rl".
+        let buttons = YesNoWindowView.makeButtons(from: responses)
+        let panel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
+            styleMask: [.titled, .closable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+        panel.animationBehavior = .none
+        panel.isRestorable = false
+        panel.isReleasedWhenClosed = false
+        var result = cancelValue
+        let view = YesNoWindowView(
+            question: displayQuestion,
+            buttons: buttons,
+            defaultValue: defaultResponse,
+            cancelValue: cancelValue,
+            onSelect: { value in
+                result = value
+                NSApp.stopModal()
+            }
+        )
+        let hc = NSHostingController(rootView: view)
+        panel.contentViewController = hc
+        NSApp.runModal(for: panel)
+        panel.close()
+        completion(result)
+    }
+
+    private func showDirectionModal(completion: @escaping (Int32) -> Void) {
+        let panel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+            styleMask: [.titled, .closable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "Which direction?"
+        panel.animationBehavior = .none
+        panel.isRestorable = false
+        panel.isReleasedWhenClosed = false
+        var result = asciiESC
+        let view = DirectionModalView { key in
+            result = key
+            NSApp.stopModal()
+        }
+        let hostingView = NSHostingView(rootView: view)
+        panel.setContentSize(hostingView.fittingSize)
+        panel.contentView = hostingView
+        NSApp.runModal(for: panel)
+        panel.close()
+        completion(result)
+    }
+
+    /// Removes the first `[…]` bracketed substring from `text`, trimming whitespace.
+    private static func strippingBracketedContent(_ text: String) -> String {
+        guard let open = text.firstIndex(of: "["),
+              let close = text[open...].firstIndex(of: "]")
+        else { return text }
+        var result = text
+        result.removeSubrange(open...close)
+        return result.trimmingCharacters(in: .whitespaces)
     }
 
     func selectMenu(in window: NHWindowID,
@@ -552,6 +614,22 @@ extension NetHackController: NetHackBridgeDelegate {
         }
     }
 }
+// MARK: - Direction Modal View
+
+/// Wraps DirectionView and catches Escape to send ESC as cancellation.
+private struct DirectionModalView: View {
+    let onKey: (Int32) -> Void
+
+    var body: some View {
+        DirectionView(onKey: onKey)
+            .fixedSize()
+            .onKeyPress(.escape) {
+                onKey(asciiESC)
+                return .handled
+            }
+    }
+}
+
 // MARK: - Status helpers
 
 /// Converts a BL_CONDITION bitmask into a human-readable comma-separated string.

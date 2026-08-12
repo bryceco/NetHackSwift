@@ -5,64 +5,66 @@ import SwiftUI
 struct DirectionView: View {
     let onKey: (Int32) -> Void
 
-    private let buttonSize: CGFloat = 40
+    private let buttonSize: CGFloat = 24
+    private let gridGap: CGFloat = 4
 
     var body: some View {
-        HStack(alignment: .center, spacing: 20) {
-            directionGrid
-            Divider()
-            specialButtons
-        }
-        .padding()
-    }
-
-    // MARK: - Subviews
-
-    private var directionGrid: some View {
-        let gap: CGFloat = 6
-        return VStack(spacing: gap) {
-            HStack(spacing: gap) {
-                arrowButton("arrow.up.left",    key: "y")
-                arrowButton("arrow.up",         key: "k")
-                arrowButton("arrow.up.right",   key: "u")
+        // Grid guarantees that each row of text buttons aligns with the
+        // corresponding row of arrow buttons without any manual frame math.
+        Grid(horizontalSpacing: gridGap, verticalSpacing: gridGap) {
+            GridRow {
+                arrowButton("arrow.up.left",   key: "y")
+                arrowButton("arrow.up",        key: "k")
+                arrowButton("arrow.up.right",  key: "u")
+                dividerCell
+                textButton("Ceiling <", key: "<")
             }
-            HStack(spacing: gap) {
-                arrowButton("arrow.left",       key: "h")
+            GridRow {
+                arrowButton("arrow.left",  key: "h")
                 Color.clear.frame(width: buttonSize, height: buttonSize)
-                arrowButton("arrow.right",      key: "l")
+                arrowButton("arrow.right", key: "l")
+                dividerCell
+                textButton("Self .",    key: ".")
             }
-            HStack(spacing: gap) {
+            GridRow {
                 arrowButton("arrow.down.left",  key: "b")
                 arrowButton("arrow.down",       key: "j")
                 arrowButton("arrow.down.right", key: "n")
+                dividerCell
+                textButton("Floor >",  key: ">")
             }
         }
-    }
-
-    private var specialButtons: some View {
-        VStack(spacing: 8) {
-            textButton("Ceiling <", key: "<")
-            textButton("Self .",    key: ".")
-            textButton("Floor >",   key: ">")
-        }
+        .padding(12)
     }
 
     // MARK: - Helpers
+
+    /// A thin separator segment sized to one grid row.
+    private var dividerCell: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(width: 0.5, height: buttonSize)
+            .padding(.horizontal, 7)
+    }
 
     private func arrowButton(_ systemImage: String, key: String) -> some View {
         Button {
             send(key)
         } label: {
             Image(systemName: systemImage)
-                .imageScale(.large)
+                .imageScale(.small)
                 .frame(width: buttonSize, height: buttonSize)
         }
         .buttonStyle(.bordered)
+        .controlSize(.small)
+        .focusable(false)
     }
 
     private func textButton(_ title: String, key: String) -> some View {
         Button(title) { send(key) }
-            .frame(width: 84)
+            .controlSize(.small)
+            .frame(width: 72)
+            .focusable(false)
     }
 
     private func send(_ key: String) {
