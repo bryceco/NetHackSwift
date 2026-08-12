@@ -70,19 +70,11 @@ struct MapView: View {
             }
             .background(.black)
             .frame(width: mapWidth, height: mapHeight)
-            .simultaneousGesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        let col = Int32(value.location.x / tileW)
-                        let row = Int32(value.location.y / tileH)
-                        controller.sendMouseClick(x: col, y: row, mod: NHMouseButton.left.rawValue)
-                    }
-            )
             .overlay(
-                RightClickOverlay { location in
+                MouseClickOverlay { location, button in
                     let col = Int32(location.x / tileW)
                     let row = Int32(location.y / tileH)
-                    controller.sendMouseClick(x: col, y: row, mod: NHMouseButton.right.rawValue)
+                    controller.sendMouseClick(x: col, y: row, mod: button.rawValue)
                 }
             )
         }
@@ -91,29 +83,36 @@ struct MapView: View {
     }
 }
 
-/// Transparent overlay that captures right-click (secondary mouse button) events
-/// and reports the click location in its own coordinate space.
-private struct RightClickOverlay: NSViewRepresentable {
-    let onRightClick: (CGPoint) -> Void
+/// Transparent overlay that captures left- and right-click events and reports
+/// the click location in its own coordinate space.
+private struct MouseClickOverlay: NSViewRepresentable {
+    let onClick: (CGPoint, NHMouseButton) -> Void
 
     func makeNSView(context: Context) -> NSView {
-        let view = RightClickView()
-        view.onRightClick = onRightClick
+        let view = ClickView()
+        view.onClick = onClick
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? RightClickView)?.onRightClick = onRightClick
+        (nsView as? ClickView)?.onClick = onClick
     }
 
-    private class RightClickView: NSView {
-        var onRightClick: ((CGPoint) -> Void)?
+    private class ClickView: NSView {
+        var onClick: ((CGPoint, NHMouseButton) -> Void)?
+
+        private func flipped(_ event: NSEvent) -> CGPoint {
+            let loc = convert(event.locationInWindow, from: nil)
+            // Flip from AppKit (origin bottom-left) to SwiftUI (origin top-left).
+            return CGPoint(x: loc.x, y: bounds.height - loc.y)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            onClick?(flipped(event), .left)
+        }
 
         override func rightMouseUp(with event: NSEvent) {
-            let location = convert(event.locationInWindow, from: nil)
-            // Flip from AppKit (origin bottom-left) to SwiftUI (origin top-left).
-            let flipped = CGPoint(x: location.x, y: bounds.height - location.y)
-            onRightClick?(flipped)
+            onClick?(flipped(event), .right)
         }
     }
 }
