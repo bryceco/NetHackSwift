@@ -272,6 +272,7 @@ extension NetHackController: NetHackBridgeDelegate {
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
             let hasTitle = !data.menuTitle.isEmpty
+			assert(blocking) // pretty sure there are always blocking, fix later if we're wrong
             let panelClass: NSPanel.Type = blocking ? KeyablePanel.self : NSPanel.self
             let panel = panelClass.init(
                 contentRect: NSRect(x: 0, y: 0, width: 259, height: 100),
@@ -538,6 +539,12 @@ extension NetHackController: NetHackBridgeDelegate {
         let hostingView = NSHostingView(rootView: view)
         panel.setContentSize(hostingView.fittingSize)
         panel.contentView = hostingView
+
+        // Pre-measure the size to avoid a preferredContentSize resize loop with Grid.
+        let contentSize = NSHostingView(rootView: view).fittingSize
+        let hc = NSHostingController(rootView: view)
+        panel.setContentSize(contentSize)
+        panel.contentViewController = hc
         NSApp.runModal(for: panel)
         panel.close()
         completion(result)
@@ -616,17 +623,39 @@ extension NetHackController: NetHackBridgeDelegate {
 }
 // MARK: - Direction Modal View
 
-/// Wraps DirectionView and catches Escape to send ESC as cancellation.
+/// Wraps DirectionView for modal presentation with keyboard support.
 private struct DirectionModalView: View {
     let onKey: (Int32) -> Void
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         DirectionView(onKey: onKey)
-            .fixedSize()
-            .onKeyPress(.escape) {
-                onKey(asciiESC)
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isFocused)
+            .onAppear { isFocused = true }
+            .onKeyPress { press in
+                guard let key = Self.directionKey(from: press) else { return .ignored }
+                onKey(key)
                 return .handled
             }
+    }
+
+    /// Translates a SwiftUI KeyPress into the NetHack direction key code it represents,
+    /// or nil if the key is not a recognised direction input.
+    private static func directionKey(from press: KeyPress) -> Int32? {
+        let shift = press.modifiers.contains(.shift)
+        switch press.key {
+        case .upArrow:    return Int32(UInt8(ascii: shift ? "K" : "k"))
+        case .downArrow:  return Int32(UInt8(ascii: shift ? "J" : "j"))
+        case .leftArrow:  return Int32(UInt8(ascii: shift ? "H" : "h"))
+        case .rightArrow: return Int32(UInt8(ascii: shift ? "L" : "l"))
+        default: break
+        }
+        guard let char = press.characters.first else { return nil }
+        if char == "\u{1B}" { return asciiESC }
+        let valid = Set<Character>("yYkKuUhHlLbBjJnN<>.")
+        return valid.contains(char) ? Int32(char.asciiValue ?? 0) : nil
     }
 }
 
