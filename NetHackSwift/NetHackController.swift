@@ -176,15 +176,14 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func moveCursor(in window: NHWindowID, x: Int32, y: Int32) {
-		print("moveCursor")
-        if pendingWindows[window]?.type == .map {
-            gameState?.mapCursorX = x
-            gameState?.mapCursorY = y
-        }
+		guard pendingWindows[window]?.type == .map else {
+			print("bad moveCursor")
+			return
+		}
+		gameState?.mapCursor = (x, y)
     }
 
     func putString(in window: NHWindowID, string: String, attribute: NHTextAttribute) {
-		print("putString \(windowName(for: window)): \(string)")
         guard let data = pendingWindows[window] else {
             print(string)
             return
@@ -213,12 +212,10 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Window lifecycle
 
 	func createNhwindow(_ window: NHWindowID, type: NHWindowType) {
-		print("createNhwindow: \(window)")
 		pendingWindows[window] = NHWindowData(type: type)
 	}
 
     func clearNhwindow(_ window: NHWindowID) {
-		print("clearNhwindow \(windowName(for: window))")
 		if pendingWindows[window]?.type == .message {
 			pendingWindows[window]?.pendingClear = true
 			return
@@ -276,7 +273,6 @@ extension NetHackController: NetHackBridgeDelegate {
 			assert(false)	// not sure this path is ever used
 			showMenuWindow(window: window, selectionMode: .none, onAccept: nil, onCancel: nil)
 		case .map:
-			print("update map tiles")
 			gameState?.mapVersion += 1
 		case .status:
 			print("display status")
@@ -314,8 +310,8 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func clipAround(x: Int32, y: Int32) {
-        // TODO: scroll the map so (x, y) is visible
-		print("cliparound")
+        gameState?.clipAround = (x, y)
+        gameState?.clipAroundVersion += 1
     }
 
     // MARK: Menus

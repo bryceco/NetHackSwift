@@ -58,10 +58,15 @@ final class GameState {
         empty.glyph = -1
         return Array(repeating: empty, count: 21 * 80)
     }()
-    var mapCursorX: Int32 = 0
-    var mapCursorY: Int32 = 0
+    var mapCursor: (x: Int32, y: Int32) = (0, 0)
     // Incremented by displayWindow(.map) to trigger a single Canvas redraw per frame.
     var mapVersion: Int = 0
+    // Written by clipAround() before bumping clipAroundVersion.
+    // @ObservationIgnored so writes don't trigger a re-render on their own;
+    // the version bump is what causes MapView to read the updated coordinates.
+    @ObservationIgnored var clipAround: (x: Int32, y: Int32) = (0, 0)
+    // Incremented by clipAround() to trigger a scroll to the clip-around position.
+    var clipAroundVersion: Int = 0
 
     // When true, MapView draws ttychar text instead of tile images.
     var mapUsesTextDisplay: Bool = false
