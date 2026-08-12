@@ -74,6 +74,8 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
     // Retained token for the global key-down event monitor.
     @ObservationIgnored private var keyEventMonitor: Any?
+    // Set when Cmd-Q triggers a save-and-quit; auto-confirms the "Really save?" prompt.
+    @ObservationIgnored private var isSavingAndQuitting = false
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -102,6 +104,16 @@ private struct NHMenuItem {
             else {
 				return event
 			}
+            // Cmd-Q: ask NetHack to save, then auto-confirm and terminate.
+            if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+               event.characters == "q"
+			{
+                self.isSavingAndQuitting = true
+                self.sendKey(Int32(UInt8(ascii: "S")))
+                return nil
+            }
+            // Let other Command-key shortcuts (Cmd-H, Cmd-W, …) reach the app menu.
+            if event.modifierFlags.contains(.command) { return event }
             self.sendKey(Self.keyCode(from: event))
             return nil  // consume the event
         }
@@ -145,8 +157,11 @@ private struct NHMenuItem {
         bridge.delegate = self
         bridge.run(withHackdirURL: resourcesURL,
 				   playgroundURL: playgroundURL,
-				   completion: { exitCode in
+				   completion: { [weak self] exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
+            if self?.isSavingAndQuitting == true {
+                DispatchQueue.main.async { NSApp.terminate(nil) }
+            }
         })
     }
 
@@ -470,6 +485,10 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
         print("yn_function: \(query) [\(responses)]")
+        if isSavingAndQuitting {
+            completion(Int32(UInt8(ascii: "y")))
+            return
+        }
 
         // Direction questions get a dedicated direction-picker panel.
 		if responses.isEmpty && query.lowercased().contains("direction") {
