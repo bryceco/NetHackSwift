@@ -35,7 +35,11 @@ final class KeyboardHandler {
                 // Let other Command-key shortcuts (Cmd-H, Cmd-W, …) reach the app menu.
                 if event.modifierFlags.contains(.command) { return event }
 
-                if isArrow {
+                if let mapping = Self.numpadKeyMap[keyCode] {
+                    // Numpad keys encode a single direction each — fire immediately.
+                    let shift = event.modifierFlags.contains(.shift)
+                    self.onKey?(Int32(shift ? mapping.shifted : mapping.plain))
+                } else if isArrow {
                     // Accumulate arrow keys; resolve the chord on key-up.
                     self.pressedDirectionKeys.insert(keyCode)
                     self.pendingDirectionKeys.insert(keyCode)
@@ -77,6 +81,25 @@ final class KeyboardHandler {
 
     /// Arrow key codes on macOS (left=123, right=124, down=125, up=126).
     private static let arrowKeyCodes: Set<Int> = [123, 124, 125, 126]
+
+    /// Maps numeric-keypad hardware key codes to (plain, shifted) vi-motion ASCII values.
+    /// Shift uppercases direction keys for run mode; KP5 (wait) is unaffected by shift.
+    ///
+    ///   KP layout       key code   plain / shifted
+    ///   7  8  9         89 91 92   y/Y  k/K  u/U
+    ///   4  5  6         86 87 88   h/H  .    l/L
+    ///   1  2  3         83 84 85   b/B  j/J  n/N
+    private static let numpadKeyMap: [Int: (plain: UInt8, shifted: UInt8)] = [
+        89: (121,  89),   // KP7 → y/Y northwest
+        91: (107,  75),   // KP8 → k/K north
+        92: (117,  85),   // KP9 → u/U northeast
+        86: (104,  72),   // KP4 → h/H west
+        87: ( 46,  46),   // KP5 → .   wait (shift has no effect)
+        88: (108,  76),   // KP6 → l/L east
+        83: ( 98,  66),   // KP1 → b/B southwest
+        84: (106,  74),   // KP2 → j/J south
+        85: (110,  78),   // KP3 → n/N southeast
+    ]
 
     /// Resolves a set of simultaneously-pressed arrow key codes into a single
     /// vi-motion character. Diagonal chords (e.g. left+down) map to the
