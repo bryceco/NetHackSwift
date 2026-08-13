@@ -15,6 +15,7 @@
 		02F7FEFB302A8E090071CDB0 /* nhtiles.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FEFA302A8E090071CDB0 /* nhtiles.png */; };
 		02F7FF25302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */; };
 		02F7FF42302CF33C0071CDB0 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 02F7FF41302CF33C0071CDB0 /* libz.tbd */; };
+		02F7FF72302DA6150071CDB0 /* PixelHack500_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		02F7FEFA302A8E090071CDB0 /* nhtiles.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = nhtiles.png; sourceTree = "<group>"; };
 		02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Nevanda_5.0.0_32x32.png; sourceTree = "<group>"; };
 		02F7FF41302CF33C0071CDB0 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = PixelHack500_32x32.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -92,6 +94,7 @@
 				024A52CA302934C300BA79BE /* nhdat */,
 				024A52CB302934C300BA79BE /* sysconf */,
 				02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */,
+				02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */,
 				02F7FEFA302A8E090071CDB0 /* nhtiles.png */,
 			);
 			path = Resources;
@@ -174,6 +177,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02F7FF72302DA6150071CDB0 /* PixelHack500_32x32.png in Resources */,
 				02F7FF25302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png in Resources */,
 				024A52CC302944F400BA79BE /* nhdat in Resources */,
 				02F7FEFB302A8E090071CDB0 /* nhtiles.png in Resources */,

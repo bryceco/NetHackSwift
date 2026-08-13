@@ -260,7 +260,7 @@ extension NetHackController: NetHackBridgeDelegate {
             let hc = NSHostingController(rootView: view)
             hc.sizingOptions = .preferredContentSize
             panel.contentViewController = hc
-            panel.contentMinSize = NSSize(width: 259, height: 100)
+            panel.contentMinSize = CGSize(width: 259, height: 100)
             if blocking {
                 NSApp.runModal(for: panel)
                 panel.close()
@@ -614,7 +614,7 @@ extension NetHackController: NetHackBridgeDelegate {
         let hc = NSHostingController(rootView: view)
         hc.sizingOptions = .preferredContentSize
         nsWindow.contentViewController = hc
-        nsWindow.contentMinSize = NSSize(width: 250, height: 100)
+        nsWindow.contentMinSize = CGSize(width: 250, height: 100)
         NSApp.runModal(for: nsWindow)
         if let accepted {
             onAccept?(accepted)
