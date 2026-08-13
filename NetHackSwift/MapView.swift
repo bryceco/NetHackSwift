@@ -1,5 +1,6 @@
 import AppKit
 import NetHackBridge
+import QuartzCore
 import SwiftUI
 
 struct MapView: View {
@@ -25,34 +26,49 @@ struct MapView: View {
 
         ScrollView([.horizontal, .vertical]) {
             Canvas { context, _ in
-                for row in 0..<GameState.mapRows {
-                    for col in 0..<GameState.mapCols {
-                        let idx = row * GameState.mapCols + col
-                        guard idx < glyphs.count else { continue }
-                        let glyph   = glyphs[idx]
-                        let bkGlyph = bkGlyphs[idx]
-                        guard glyph.glyph >= 0 else { continue }
-
-                        let dest = CGRect(x: CGFloat(col) * tileW,
-                                         y: CGFloat(row) * tileH,
-                                         width: tileW, height: tileH)
-
-                        if useText {
+                if useText {
+                    // Text mode: use SwiftUI drawing (needed for Text layout).
+                    for row in 0..<GameState.mapRows {
+                        for col in 0..<GameState.mapCols {
+                            let idx = row * GameState.mapCols + col
+                            guard idx < glyphs.count else { continue }
+                            let glyph = glyphs[idx]
+                            guard glyph.glyph >= 0 else { continue }
+                            let dest = CGRect(x: CGFloat(col) * tileW,
+                                             y: CGFloat(row) * tileH,
+                                             width: tileW, height: tileH)
                             if let scalar = Unicode.Scalar(UInt32(glyph.ttychar)), scalar.value > 0 {
-                                let ch = Text(String(scalar))
-                                    .font(.system(size: tileH * 0.75).monospaced())
-                                    .foregroundStyle(.white)
-                                context.draw(ch, in: dest)
+                                context.draw(
+                                    Text(String(scalar))
+                                        .font(.system(size: tileH * 0.75).monospaced())
+                                        .foregroundStyle(.white),
+                                    in: dest)
                             }
-                        } else if let tileSet {
-                            // Draw background tile first, then foreground on top.
-                            if bkGlyph.glyph >= 0,
-                               let bkTile = tileSet.image(forGlyph: bkGlyph)
-                            {
-                                context.draw(Image(nsImage: bkTile), in: dest)
-                            }
-                            if let tile = tileSet.image(forGlyph: glyph) {
-                                context.draw(Image(nsImage: tile), in: dest)
+                        }
+                    }
+                } else if let tileSet {
+                    // Tile mode: drop to CGContext for direct bitblt, bypassing
+                    // NSImage and SwiftUI Image wrapper overhead.
+                    // withCGContext provides top-left-origin coordinates matching
+                    // SwiftUI Canvas, so no CTM flip is required.
+                    context.withCGContext { cgCtx in
+                        for row in 0..<GameState.mapRows {
+                            for col in 0..<GameState.mapCols {
+                                let idx = row * GameState.mapCols + col
+                                guard idx < glyphs.count else { continue }
+                                let glyph   = glyphs[idx]
+                                let bkGlyph = bkGlyphs[idx]
+                                guard glyph.glyph >= 0 else { continue }
+                                let dest = CGRect(x: CGFloat(col) * tileW,
+                                                 y: CGFloat(row) * tileH,
+                                                 width: tileW, height: tileH)
+                                // Background tile first, foreground on top.
+                                if let bkCG = tileSet.cgImage(forGlyph: bkGlyph) {
+                                    cgCtx.draw(bkCG, in: dest)
+                                }
+                                if let cgImage = tileSet.cgImage(forGlyph: glyph) {
+                                    cgCtx.draw(cgImage, in: dest)
+                                }
                             }
                         }
                     }

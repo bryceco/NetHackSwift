@@ -8,6 +8,7 @@
 import AppKit
 import Foundation
 import Observation
+import QuartzCore
 import SwiftUI
 import NetHackBridge
 
@@ -111,6 +112,7 @@ private struct NHMenuItem {
 	{
         guard let bridge else { return }
         bridge.delegate = self
+		print("Playground at \(playgroundURL.path)")
         bridge.run(withHackdirURL: resourcesURL,
 				   playgroundURL: playgroundURL,
 				   completion: { [weak self] exitCode in
@@ -273,6 +275,7 @@ extension NetHackController: NetHackBridgeDelegate {
 			assert(false)	// not sure this path is ever used
 			showMenuWindow(window: window, selectionMode: .none, onAccept: nil, onCancel: nil)
 		case .map:
+            gameState?.clipAroundVersion += 1
 			gameState?.mapVersion += 1
 		case .status:
 			print("display status")
@@ -311,7 +314,8 @@ extension NetHackController: NetHackBridgeDelegate {
 
     func clipAround(x: Int32, y: Int32) {
         gameState?.clipAround = (x, y)
-        gameState?.clipAroundVersion += 1
+        // clipAroundVersion is bumped in displayNhwindow(.map) so the scroll
+        // and Canvas redraw happen together, after glyphs are flushed.
     }
 
     // MARK: Menus
@@ -399,6 +403,13 @@ extension NetHackController: NetHackBridgeDelegate {
     func requestPlayerSelection() {
         // TODO: show character creation UI
 		print("requestPlayerSelection")
+    }
+
+    func waitSynch() {
+        // Glyphs were already flushed by the bridge before this call.
+        // Bump version counters so MapView redraws with the current state.
+        gameState?.clipAroundVersion += 1
+        gameState?.mapVersion += 1
     }
 
     func initWindows() {
