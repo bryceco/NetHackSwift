@@ -16,7 +16,7 @@ struct MainWindowView: View {
                         .frame(minWidth: 153, maxWidth: .infinity)
                         .frame(height: 160)
                 }
-                MapView()
+                MapContainerView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(minWidth: 637, maxWidth: .infinity, minHeight: 376, maxHeight: .infinity)
