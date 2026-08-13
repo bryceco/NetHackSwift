@@ -37,7 +37,7 @@ struct TileSetDescriptor {
 
 	static var `default`: TileSetDescriptor {
 		get {
-			return Self.available[0]
+			return Self.available[1]
 		}
 	}
 }
@@ -46,9 +46,11 @@ struct TileSetDescriptor {
 
 /// Manages the NetHack tile sprite sheet and vends per-tile CGImages.
 ///
-/// Extraction uses `CGImage.cropping(to:)` directly. CGImage has y=0 at the
-/// top of the image, which matches the visual layout of the sprite sheet
-/// (tile 0 at top-left), so no coordinate flipping is needed.
+/// Tile extraction uses `CGImage.cropping(to:)`. CGImage has y=0 at the top,
+/// which matches the visual layout of the sprite sheet (tile 0 at top-left),
+/// so the cropping rect arithmetic needs no y-flip.
+/// Note: rendering the extracted CGImages into a SwiftUI Canvas CGContext
+/// (which is y-down) requires a coordinate flip at the call site; see MapView.
 final class TileSet {
 	let image: NSImage
 	let tileSize: CGSize

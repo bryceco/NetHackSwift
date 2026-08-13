@@ -40,6 +40,15 @@ struct MapView: View {
                 }
             } else if let ts = tileSet {
                 context.withCGContext { cgCtx in
+                    // SwiftUI Canvas provides a CGContext with y=0 at the top (y
+                    // increases downward). CGContext.draw(_:in:) maps CGImage row 0
+                    // to the bottom of the dest rect in the context's coordinate
+                    // space, which in a top-down context is the visual top — so
+                    // every tile appears upside-down without correction.
+                    // Flip y once for the whole batch; adjust the row->y formula below.
+                    cgCtx.translateBy(x: 0, y: size.height)
+                    cgCtx.scaleBy(x: 1, y: -1)
+
                     for row in 0..<GameState.mapRows {
                         for col in 0..<GameState.mapCols {
                             let idx = row * GameState.mapCols + col
@@ -47,9 +56,13 @@ struct MapView: View {
                             let fg = glyphs[idx]
                             let bk = bkGlyphs[idx]
                             guard fg.glyph >= 0 else { continue }
-                            let dest = CGRect(x: CGFloat(col) * tileSize.width,
-                                             y: CGFloat(row) * tileSize.height,
-                                             width: tileSize.width, height: tileSize.height)
+                            // After the flip the context has y=0 at the bottom.
+                            // Invert the row index so row 0 lands at the visual top.
+                            let dest = CGRect(
+                                x: CGFloat(col) * tileSize.width,
+                                y: CGFloat(GameState.mapRows - 1 - row) * tileSize.height,
+                                width: tileSize.width, height: tileSize.height
+                            )
                             if let bkCG = ts.cgImage(forGlyph: bk) {
                                 cgCtx.draw(bkCG, in: dest)
                             }
