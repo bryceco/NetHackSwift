@@ -1,73 +1,92 @@
 import AppKit
 import NetHackBridge
-import QuartzCore
 import SwiftUI
 
 struct MapView: View {
     @Environment(GameState.self) private var gameState
     @Environment(NetHackController.self) private var controller
 
-    var body: some View {
-        // Capture all game-state reads here so @Observable tracks them and
-        // re-evaluates body (and therefore re-draws the Canvas) on changes.
-        let tileSet      = TileSet.shared
-        let tileW        = tileSet?.tileSize.width  ?? 16
-        let tileH        = tileSet?.tileSize.height ?? 16
-        let _            = gameState.mapVersion   // observed; triggers re-render each display
-        let glyphs       = gameState.mapGlyphs
-        let bkGlyphs     = gameState.mapBkGlyphs
-        let (cursorX, cursorY) = gameState.mapCursor
-        let (clipX, clipY)     = gameState.clipAround
-        let clipVersion  = gameState.clipAroundVersion
-        let hpPercent    = gameState.maxHp > 0 ? gameState.hp * 100 / gameState.maxHp : 100
-        let useText      = gameState.mapUsesTextDisplay
-        let mapWidth     = CGFloat(GameState.mapCols) * tileW
-        let mapHeight    = CGFloat(GameState.mapRows) * tileH
+    // Stored scroll position for manual scrolling. When needsClipSync is true
+    // the view centers on the game's clipAround tile instead.
+    @State private var scrollX: CGFloat = 0
+    @State private var scrollY: CGFloat = 0
+    @State private var needsClipSync = true
 
-        ScrollView([.horizontal, .vertical]) {
-            Canvas { context, _ in
+    var body: some View {
+        let tileSet   = TileSet.shared
+        let tileSize  = tileSet?.tileSize ?? CGSize(width: 16, height: 16)
+        let _         = gameState.mapVersion
+        let glyphs    = gameState.mapGlyphs
+        let bkGlyphs  = gameState.mapBkGlyphs
+        let cursor      = gameState.mapCursor
+        let clip        = gameState.clipAround
+        let clipVersion = gameState.clipAroundVersion
+        let hpPercent = gameState.maxHp > 0 ? gameState.hp * 100 / gameState.maxHp : 100
+        let useText   = gameState.mapUsesTextDisplay
+
+        GeometryReader { geo in
+            let mapW = CGFloat(GameState.mapCols) * tileSize.width
+            let mapH = CGFloat(GameState.mapRows) * tileSize.height
+
+            // Game's desired origin: center clipAround tile, clamped to map bounds.
+            let cx = CGFloat(clip.x) * tileSize.width  + tileSize.width  / 2
+            let cy = CGFloat(clip.y) * tileSize.height + tileSize.height / 2
+            let gameOriginX = max(0, min(cx - geo.size.width  / 2, mapW - geo.size.width))
+            let gameOriginY = max(0, min(cy - geo.size.height / 2, mapH - geo.size.height))
+
+            // Active origin: game-driven normally, user-driven during manual scroll.
+            let maxScrollX = max(0, mapW - geo.size.width)
+            let maxScrollY = max(0, mapH - geo.size.height)
+            let originX = needsClipSync ? gameOriginX : max(0, min(scrollX, maxScrollX))
+            let originY = needsClipSync ? gameOriginY : max(0, min(scrollY, maxScrollY))
+
+            Canvas { context, size in
+                // Only draw tiles that intersect the visible area.
+                let startCol = max(0, Int(originX / tileSize.width))
+                let startRow = max(0, Int(originY / tileSize.height))
+                let endCol   = min(GameState.mapCols,
+                                   Int(ceil((originX + size.width)  / tileSize.width)))
+                let endRow   = min(GameState.mapRows,
+                                   Int(ceil((originY + size.height) / tileSize.height)))
+
                 if useText {
-                    // Text mode: use SwiftUI drawing (needed for Text layout).
-                    for row in 0..<GameState.mapRows {
-                        for col in 0..<GameState.mapCols {
+                    for row in startRow..<endRow {
+                        for col in startCol..<endCol {
                             let idx = row * GameState.mapCols + col
                             guard idx < glyphs.count else { continue }
                             let glyph = glyphs[idx]
                             guard glyph.glyph >= 0 else { continue }
-                            let dest = CGRect(x: CGFloat(col) * tileW,
-                                             y: CGFloat(row) * tileH,
-                                             width: tileW, height: tileH)
-                            if let scalar = Unicode.Scalar(UInt32(glyph.ttychar)), scalar.value > 0 {
+                            let dest = CGRect(x: CGFloat(col) * tileSize.width  - originX,
+                                             y: CGFloat(row) * tileSize.height - originY,
+                                             width: tileSize.width, height: tileSize.height)
+                            if let scalar = Unicode.Scalar(UInt32(glyph.ttychar)),
+                               scalar.value > 0 {
                                 context.draw(
                                     Text(String(scalar))
-                                        .font(.system(size: tileH * 0.75).monospaced())
+                                        .font(.system(size: tileSize.height * 0.75).monospaced())
                                         .foregroundStyle(.white),
                                     in: dest)
                             }
                         }
                     }
-                } else if let tileSet {
-                    // Tile mode: drop to CGContext for direct bitblt, bypassing
-                    // NSImage and SwiftUI Image wrapper overhead.
-                    // withCGContext provides top-left-origin coordinates matching
-                    // SwiftUI Canvas, so no CTM flip is required.
+                } else if let ts = tileSet {
+                    // Tile mode: drop to CGContext for direct bitblt.
                     context.withCGContext { cgCtx in
-                        for row in 0..<GameState.mapRows {
-                            for col in 0..<GameState.mapCols {
+                        for row in startRow..<endRow {
+                            for col in startCol..<endCol {
                                 let idx = row * GameState.mapCols + col
                                 guard idx < glyphs.count else { continue }
-                                let glyph   = glyphs[idx]
-                                let bkGlyph = bkGlyphs[idx]
-                                guard glyph.glyph >= 0 else { continue }
-                                let dest = CGRect(x: CGFloat(col) * tileW,
-                                                 y: CGFloat(row) * tileH,
-                                                 width: tileW, height: tileH)
-                                // Background tile first, foreground on top.
-                                if let bkCG = tileSet.cgImage(forGlyph: bkGlyph) {
+                                let fg = glyphs[idx]
+                                let bk = bkGlyphs[idx]
+                                guard fg.glyph >= 0 else { continue }
+                                let dest = CGRect(x: CGFloat(col) * tileSize.width  - originX,
+                                                 y: CGFloat(row) * tileSize.height - originY,
+                                                 width: tileSize.width, height: tileSize.height)
+                                if let bkCG = ts.cgImage(forGlyph: bk) {
                                     cgCtx.draw(bkCG, in: dest)
                                 }
-                                if let cgImage = tileSet.cgImage(forGlyph: glyph) {
-                                    cgCtx.draw(cgImage, in: dest)
+                                if fg.glyph != bk.glyph, let fgCG = ts.cgImage(forGlyph: fg) {
+                                    cgCtx.draw(fgCG, in: dest)
                                 }
                             }
                         }
@@ -75,9 +94,9 @@ struct MapView: View {
                 }
 
                 // Cursor rectangle, color-coded by remaining HP.
-                let cursorRect = CGRect(x: CGFloat(cursorX) * tileW,
-                                        y: CGFloat(cursorY) * tileH,
-                                        width: tileW, height: tileH)
+                let cursorRect = CGRect(x: CGFloat(cursor.x) * tileSize.width  - originX,
+                                        y: CGFloat(cursor.y) * tileSize.height - originY,
+                                        width: tileSize.width, height: tileSize.height)
                 let cursorColor: Color = hpPercent > 75
                     ? .green.opacity(0.9)
                     : hpPercent > 50
@@ -86,113 +105,79 @@ struct MapView: View {
                 context.stroke(Path(cursorRect), with: .color(cursorColor))
             }
             .background(.black)
-            .frame(width: mapWidth, height: mapHeight)
-            .overlay(
-                MouseClickOverlay { location, button in
-                    let col = Int32(location.x / tileW)
-                    let row = Int32(location.y / tileH)
-                    controller.sendMouseClick(x: col, y: row, mod: button.rawValue)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Vertical scroll indicator. Uses a full-height VStack as the gesture
+            // target so the hit area matches the entire track, not just the thumb.
+            .overlay(alignment: .topTrailing) {
+                if mapH > geo.size.height {
+                    let track  = geo.size.height
+                    let thumbH = max(20.0, track * geo.size.height / mapH)
+                    let pos    = (track - thumbH) * originY / (mapH - geo.size.height)
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: pos)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.4))
+                            .frame(width: 8, height: thumbH)
+                        Spacer()
+                    }
+                    .frame(width: 12, height: track)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                needsClipSync = false
+                                let p = max(0, min(value.location.y - thumbH / 2,
+                                                   track - thumbH))
+                                scrollY = p / max(1, track - thumbH) * maxScrollY
+                            }
+                    )
+                    .padding(.trailing, 2)
                 }
-            )
-            // Invisible view that triggers NSScrollView scrolling when clipAroundVersion changes.
-            .background(
-                ClipAroundScroller(
-                    version: clipVersion,
-                    tileX: clipX, tileY: clipY,
-                    tileW: tileW, tileH: tileH
-                )
-            )
-        }
-        .background(Color(white: 0.21)) // charcoal gray for excess space
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// Transparent overlay that captures left- and right-click events and reports
-/// the click location in its own coordinate space.
-private struct MouseClickOverlay: NSViewRepresentable {
-    let onClick: (CGPoint, NHMouseButton) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = ClickView()
-        view.onClick = onClick
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? ClickView)?.onClick = onClick
-    }
-
-    private class ClickView: NSView {
-        var onClick: ((CGPoint, NHMouseButton) -> Void)?
-
-        private func flipped(_ event: NSEvent) -> CGPoint {
-            let loc = convert(event.locationInWindow, from: nil)
-            // Flip from AppKit (origin bottom-left) to SwiftUI (origin top-left).
-            return CGPoint(x: loc.x, y: bounds.height - loc.y)
-        }
-
-        override func mouseUp(with event: NSEvent) {
-            onClick?(flipped(event), .left)
-        }
-
-        override func rightMouseUp(with event: NSEvent) {
-            onClick?(flipped(event), .right)
-        }
-    }
-}
-
-/// Invisible NSViewRepresentable that scrolls the enclosing NSScrollView so that
-/// the tile at (tileX, tileY) is visible, centered if possible. It walks up the
-/// view hierarchy to find the NSScrollView, avoiding SwiftUI ScrollViewProxy
-/// reliability issues on macOS.
-private struct ClipAroundScroller: NSViewRepresentable {
-    let version: Int
-    let tileX: Int32
-    let tileY: Int32
-    let tileW: CGFloat
-    let tileH: CGFloat
-
-    func makeNSView(context: Context) -> NSView {
-        let view = ScrollTriggerView()
-        view.isHidden = true
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        guard let trigger = nsView as? ScrollTriggerView,
-              trigger.lastVersion != version else { return }
-        trigger.lastVersion = version
-
-        // Walk up the hierarchy to find the NSScrollView.
-        var current: NSView? = nsView
-        while let v = current {
-            if let scrollView = v as? NSScrollView {
-                let rect = CGRect(
-                    x: CGFloat(tileX) * tileW,
-                    y: CGFloat(tileY) * tileH,
-                    width: tileW,
-                    height: tileH
-                )
-                // Center the target rect in the visible area.
-                let visible = scrollView.contentView.bounds.size
-                let centeredOrigin = CGPoint(
-                    x: rect.midX - visible.width  / 2,
-                    y: rect.midY - visible.height / 2
-                )
-                let contentSize = scrollView.documentView?.bounds.size ?? .zero
-                let clampedX = max(0, min(centeredOrigin.x, contentSize.width  - visible.width))
-                let clampedY = max(0, min(centeredOrigin.y, contentSize.height - visible.height))
-                scrollView.contentView.scroll(to: CGPoint(x: clampedX, y: clampedY))
-                scrollView.reflectScrolledClipView(scrollView.contentView)
-                return
             }
-            current = v.superview
+            // Horizontal scroll indicator.
+            .overlay(alignment: .bottomLeading) {
+                if mapW > geo.size.width {
+                    let track  = geo.size.width
+                    let thumbW = max(20.0, track * geo.size.width / mapW)
+                    let pos    = (track - thumbW) * originX / (mapW - geo.size.width)
+                    HStack(spacing: 0) {
+                        Color.clear.frame(width: pos)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.4))
+                            .frame(width: thumbW, height: 8)
+                        Spacer()
+                    }
+                    .frame(width: track, height: 12)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                needsClipSync = false
+                                let p = max(0, min(value.location.x - thumbW / 2,
+                                                   track - thumbW))
+                                scrollX = p / max(1, track - thumbW) * maxScrollX
+                            }
+                    )
+                    .padding(.bottom, 2)
+                }
+            }
+            .gesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        let col = Int32((value.location.x + originX) / tileSize.width)
+                        let row = Int32((value.location.y + originY) / tileSize.height)
+                        let button: NHMouseButton =
+                            NSApp.currentEvent?.type == .rightMouseUp ? .right : .left
+                        controller.sendMouseClick(x: col, y: row, mod: button.rawValue)
+                    }
+            )
+            // When the game scrolls (clipAround changes), hand control back to the game.
+            .onChange(of: clipVersion) { _, _ in
+                needsClipSync = true
+            }
         }
-    }
-
-    private class ScrollTriggerView: NSView {
-        var lastVersion: Int = -1
+        .background(.black)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
