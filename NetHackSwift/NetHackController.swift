@@ -76,8 +76,9 @@ private struct NHMenuItem {
     @ObservationIgnored private let keyboard = KeyboardHandler()
     // Set when Cmd-Q triggers a save-and-quit; auto-confirms the "Really save?" prompt.
     @ObservationIgnored private var isSavingAndQuitting = false
-    // Key pressed while a message modal was open; consumed by the next needKeyInput/needKeyOrMouseInput.
-    @ObservationIgnored private var pendingPassthroughKey: Int32?
+    // Keys pressed before NetHack has asked for input (e.g. during a message modal).
+    // Consumed in FIFO order by the next needKeyInput/needKeyOrMouseInput.
+    @ObservationIgnored private var pendingKeyInputQueue: [Int32] = []
     // True while a blocking message/text modal is running.
     @ObservationIgnored private var isShowingMessageModal = false
 
@@ -110,10 +111,10 @@ private struct NHMenuItem {
             guard let self else { return }
             if self.isShowingMessageModal {
                 // ESC and Return close the modal without passing the key through.
-                // Any other key is forwarded as the next game keystroke.
+                // Any other key is queued for the next needKeyInput/needKeyOrMouseInput.
                 let asciiReturn: Int32 = 13
                 if key != asciiESC && key != asciiReturn {
-                    self.pendingPassthroughKey = key
+                    self.pendingKeyInputQueue.append(key)
                 }
                 NSApp.stopModal()
             } else {
@@ -138,7 +139,8 @@ private struct NHMenuItem {
         })
     }
 
-    /// Forward a keypress to whichever blocking key-input request is pending.
+    /// Forward a keypress to whichever blocking key-input request is pending,
+    /// or enqueue it if NetHack has not yet asked for input.
     func sendKey(_ key: Int32) {
         if let completion = pendingKeyCompletion {
             pendingKeyCompletion = nil
@@ -146,6 +148,8 @@ private struct NHMenuItem {
         } else if let completion = pendingKeyOrMouseCompletion {
             pendingKeyOrMouseCompletion = nil
             completion(key, 0, 0, 0)
+        } else {
+            pendingKeyInputQueue.append(key)
         }
     }
 
@@ -525,9 +529,8 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func needKeyInput(_ completion: @escaping (Int32) -> Void) {
-        if let key = pendingPassthroughKey {
-            pendingPassthroughKey = nil
-            completion(key)
+        if !pendingKeyInputQueue.isEmpty {
+            completion(pendingKeyInputQueue.removeFirst())
             return
         }
         keyboard.resetChordState()
@@ -535,9 +538,8 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func needKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
-        if let key = pendingPassthroughKey {
-            pendingPassthroughKey = nil
-            completion(key, 0, 0, 0)
+        if !pendingKeyInputQueue.isEmpty {
+            completion(pendingKeyInputQueue.removeFirst(), 0, 0, 0)
             return
         }
         keyboard.resetChordState()
