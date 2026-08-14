@@ -44,8 +44,9 @@ struct MenuWindowView: View {
     private var displayCategories: [MenuCategory] {
         guard sortAlphabetically else { return categories }
         return categories.map { cat in
-            MenuCategory(title: cat.title,
-                         items: cat.items.sorted { $0.text < $1.text })
+            let keyed = cat.items.filter { !$0.key.isEmpty }.sorted { $0.text < $1.text }
+            let info  = cat.items.filter {  $0.key.isEmpty }
+            return MenuCategory(title: cat.title, items: keyed + info)
         }
     }
 
