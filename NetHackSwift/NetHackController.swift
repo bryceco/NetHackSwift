@@ -401,11 +401,18 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func requestPlayerSelection(withRoles roleNames: [String],
+                                roleGlyphs: [NSNumber],
                                 races raceNames: [String],
+                                raceGlyphs: [NSNumber],
                                 genders genderNames: [String],
                                 aligns alignNames: [String]) -> NHPlayerSelection? {
-        let races   = raceNames.map   { PlayerOption(name: $0) }
-        let roles   = roleNames.map   { PlayerOption(name: $0) }
+        let tileSet = TileSet.shared
+        let roles   = zip(roleNames, roleGlyphs).map { name, glyph in
+            PlayerOption(name: name, image: tileSet?.image(forGlyph: glyph.intValue))
+        }
+        let races   = zip(raceNames, raceGlyphs).map { name, glyph in
+            PlayerOption(name: name, image: tileSet?.image(forGlyph: glyph.intValue))
+        }
         let genders = genderNames.map { PlayerOption(name: $0) }
         let aligns  = alignNames.map  { PlayerOption(name: $0) }
 

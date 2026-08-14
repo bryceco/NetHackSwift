@@ -123,7 +123,7 @@ struct PlayerSelectionView: View {
             // Three-column layout
             HStack(alignment: .top, spacing: 12) {
                 racePanel
-                    .frame(width: 100)
+                    .fixedSize(horizontal: true, vertical: false)
                 rolePanel
                     .frame(maxWidth: .infinity)
                 rightPanel
@@ -144,6 +144,7 @@ struct PlayerSelectionView: View {
                 ForEach(races.indices, id: \.self) { i in
                     RadioButton(
                         label: races[i].name.capitalized,
+                        image: races[i].image,
                         isSelected: selectedRaceIndex == i,
                         isEnabled: NetHackBridge.isValid(race: i, forRole: selectedRoleIndex),
                         action: { selectRace(i) }
@@ -162,6 +163,7 @@ struct PlayerSelectionView: View {
                 ForEach(roles.indices, id: \.self) { i in
                     RadioButton(
                         label: roles[i].name,
+                        image: roles[i].image,
                         isSelected: selectedRoleIndex == i,
                         isEnabled: NetHackBridge.isValid(race: selectedRaceIndex, forRole: i),
                         action: { selectRole(i) }
@@ -176,7 +178,7 @@ struct PlayerSelectionView: View {
 
     private var rightPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            GroupBox("Sex") {
+            GroupBox("Gender") {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(genders.indices, id: \.self) { i in
                         RadioButton(
@@ -235,6 +237,7 @@ struct PlayerSelectionView: View {
 
 private struct RadioButton: View {
     let label: String
+    var image: NSImage? = nil
     let isSelected: Bool
     let isEnabled: Bool
     let action: () -> Void
@@ -244,6 +247,10 @@ private struct RadioButton: View {
             HStack(spacing: 6) {
                 Image(systemName: isSelected ? "circle.inset.filled" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                if let image {
+                    Image(nsImage: image)
+                        .interpolation(.none)
+                }
                 Text(label)
             }
             .opacity(isEnabled ? 1.0 : 0.35)

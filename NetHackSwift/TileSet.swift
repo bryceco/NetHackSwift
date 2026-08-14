@@ -115,4 +115,9 @@ final class TileSet {
 		let tile = NetHackBridge.tileIndex(forGlyph: glyph)
 		return cgImage(forTile: tile)
 	}
+
+	func image(forGlyph glyph: Int) -> NSImage? {
+		guard let cg = cgImage(forGlyph: glyph) else { return nil }
+		return NSImage(cgImage: cg, size: tileSize)
+	}
 }
