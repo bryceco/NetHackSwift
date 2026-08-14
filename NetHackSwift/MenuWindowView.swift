@@ -183,41 +183,44 @@ private struct MenuItemRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            switch selectionMode {
-            case .none:
-                EmptyView()
-            case .one:
-                Image(systemName: isSelected ? "circle.inset.filled" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-            case .any:
-                Toggle("", isOn: $isSelected)
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
+            if item.key.isEmpty {
+                // Informational row: no control or key slot; text aligns with radio buttons above.
+                Text(item.text)
+                Spacer()
+            } else {
+                switch selectionMode {
+                case .none:
+                    EmptyView()
+                case .one:
+                    Image(systemName: isSelected ? "circle.inset.filled" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                case .any:
+                    Toggle("", isOn: $isSelected)
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                }
+
+                Text("(\(item.key))")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, alignment: .leading)
+
+                if let image = item.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 32, height: 32)
+                }
+
+                Text(item.text)
+
+                Spacer()
             }
-
-            if let image = item.image {
-                Image(nsImage: image)
-                
-					.resizable()
-                    .scaledToFit()
-                    .frame(width: 32, height: 32)
-            } else if selectionMode != .none {
-                // Spacer placeholder keeps text aligned when there are no glyphs.
-                Color.clear.frame(width: 32, height: 32)
-            }
-
-            Text("(\(item.key))")
-                .foregroundStyle(.secondary)
-
-            Text(item.text)
-
-            Spacer()
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onTapGesture {
-            if selectionMode != .none { isSelected.toggle() }
+            if selectionMode != .none && !item.key.isEmpty { isSelected.toggle() }
         }
     }
 }
@@ -239,6 +242,7 @@ private let sampleCategories: [MenuCategory] = [
     ]),
     MenuCategory(title: "Tools", items: [
         MenuItemData(key: "b", text: "a bag containing 4 items"),
+        MenuItemData(key: "", text: "an item without a hotkey"),
     ]),
 ]
 
