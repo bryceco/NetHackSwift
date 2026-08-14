@@ -24,12 +24,9 @@ This is a fork of the NetHack repo at https://github.com/NetHack/NetHack/  We wa
 We compile NetHack as a library. Build `libnh.a` from the `NetHack` root, using our hints file and WANT_LIBNH:
 
 ```sh
-make spotless && (cd sys/unix && ./setup.sh hints/macOS.500) && \
+make spotless && (cd sys/unix && ./setup.sh hints/macOS.swift) && \
 make WANT_LIBNH=1 WANT_DEFAULT=swift all
 ```
-
-<!-- FIXME(bryce): the fork section says we add hints/macOS.swift but the command
-     passes hints/macOS.500. Fix whichever is wrong and delete this comment. -->
 
 The `make spotless` and `setup.sh` steps are not optional after a hints change —
 skipping them means testing a stale Makefile.
@@ -65,7 +62,7 @@ The grep alone is not proof: a `#ifndef WIN32 / #undef / #endif` guard elsewhere
 
 - `winswift.h` is plain C with **no NetHack includes** — it is consumed by the Swift side. Member names are camelCase to avoid collisions with `winprocs.h` macros.
 
-- `winswift.c` implements `struct window_procs` and forwards to a registered `nhswift_callbacks` struct with typed callbacks.
+- `winswift.c` includes "hack.h" and so has full access to all types and globals defined by NetHack. It implements `struct window_procs` and forwards to a registered `nhswift_callbacks` struct with typed callbacks.
 - The `anything` union crosses the boundary as `uint64_t` via `memcpy`. Do not expose NetHack internals to Swift.
 - The C layer stays a thin forwarding shim. Swift owns window ID allocation.
 - Avoid the identifier `gi` and other 2-letter identifiers that can collide with #defines in NetHack's code.
