@@ -400,9 +400,63 @@ extension NetHackController: NetHackBridgeDelegate {
         }
     }
 
-    func requestPlayerSelection() {
-        // TODO: show character creation UI
-		print("requestPlayerSelection")
+    func requestPlayerSelection(withRoles roleNames: [String],
+                                races raceNames: [String],
+                                genders genderNames: [String],
+                                aligns alignNames: [String]) -> NHPlayerSelection? {
+        let races   = raceNames.map   { PlayerOption(name: $0) }
+        let roles   = roleNames.map   { PlayerOption(name: $0) }
+        let genders = genderNames.map { PlayerOption(name: $0) }
+        let aligns  = alignNames.map  { PlayerOption(name: $0) }
+
+        let panel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: 456, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "Character Selection"
+        panel.animationBehavior = .none
+        panel.isRestorable = false
+        panel.isReleasedWhenClosed = false
+        panel.isMovableByWindowBackground = true
+
+        var playerSelection: PlayerSelection? = nil
+        let view = PlayerSelectionView(
+            initialName: gameState?.playerName ?? "",
+            races: races,
+            roles: roles,
+            genders: genders,
+            aligns: aligns,
+            onPlay: { selection in
+                playerSelection = selection
+                NSApp.stopModal()
+            },
+            onQuit: {
+                NSApp.stopModal()
+                NSApp.terminate(nil)
+            }
+        )
+
+        let hc = NSHostingController(rootView: view)
+        hc.sizingOptions = .preferredContentSize
+        panel.contentViewController = hc
+        NSApp.runModal(for: panel)
+        panel.close()
+
+        guard let sel = playerSelection else { return nil }
+
+        let result = NHPlayerSelection()
+        if let raceID = sel.raceID, let idx = races.firstIndex(where: { $0.id == raceID }) {
+            result.raceIndex = idx
+        }
+        if let roleID = sel.roleID, let idx = roles.firstIndex(where: { $0.id == roleID }) {
+            result.roleIndex = idx
+        }
+        result.genderIndex = genders.firstIndex(where: { $0.id == sel.genderID }) ?? Int(NHSWIFT_ROLE_RANDOM)
+        result.alignIndex  = aligns.firstIndex(where:  { $0.id == sel.alignID  }) ?? Int(NHSWIFT_ROLE_RANDOM)
+        result.playerName = sel.name.isEmpty ? nil : sel.name
+        return result
     }
 
     func waitSynch() {

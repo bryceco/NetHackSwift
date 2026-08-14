@@ -1,78 +1,111 @@
 import SwiftUI
+import NetHackBridge
 
 // MARK: - Data Types
 
-struct PlayerRaceOption: Identifiable {
+struct PlayerOption: Identifiable {
     var id = UUID()
     var name: String
     var image: NSImage?
-    var isAvailable: Bool = true
-}
-
-struct PlayerRoleOption: Identifiable {
-    var id = UUID()
-    var name: String
-    var image: NSImage?
-    var isAvailable: Bool = true
-}
-
-enum PlayerSex: String, CaseIterable, Hashable, Identifiable {
-    case male = "Male"
-    case female = "Female"
-    var id: Self { self }
-}
-
-enum PlayerAlignment: String, CaseIterable, Hashable, Identifiable {
-    case lawful = "Lawful"
-    case neutral = "Neutral"
-    case chaotic = "Chaotic"
-    var id: Self { self }
 }
 
 struct PlayerSelection {
     var name: String
-    var raceID: PlayerRaceOption.ID?
-    var roleID: PlayerRoleOption.ID?
-    var sex: PlayerSex
-    var alignment: PlayerAlignment
+    var raceID: PlayerOption.ID?
+    var roleID: PlayerOption.ID?
+    var genderID: PlayerOption.ID?
+    var alignID: PlayerOption.ID?
 }
 
 // MARK: - PlayerSelectionView
 
 struct PlayerSelectionView: View {
-    let races: [PlayerRaceOption]
-    let roles: [PlayerRoleOption]
-    let availableSexes: Set<PlayerSex>
-    let availableAlignments: Set<PlayerAlignment>
+    let races: [PlayerOption]
+    let roles: [PlayerOption]
+    let genders: [PlayerOption]
+    let aligns: [PlayerOption]
     var onPlay: (PlayerSelection) -> Void
     var onQuit: () -> Void
 
     @State private var playerName: String
-    @State private var selectedRaceID: PlayerRaceOption.ID?
-    @State private var selectedRoleID: PlayerRoleOption.ID?
-    @State private var sex: PlayerSex
-    @State private var alignment: PlayerAlignment
+    @State private var selectedRoleIndex: Int
+    @State private var selectedRaceIndex: Int
+    @State private var selectedGenderIndex: Int
+    @State private var selectedAlignIndex: Int
 
     init(initialName: String = "",
-         races: [PlayerRaceOption],
-         roles: [PlayerRoleOption],
-         availableSexes: Set<PlayerSex> = Set(PlayerSex.allCases),
-         availableAlignments: Set<PlayerAlignment> = Set(PlayerAlignment.allCases),
+         races: [PlayerOption],
+         roles: [PlayerOption],
+         genders: [PlayerOption],
+         aligns: [PlayerOption],
          onPlay: @escaping (PlayerSelection) -> Void,
          onQuit: @escaping () -> Void) {
         self.races = races
         self.roles = roles
-        self.availableSexes = availableSexes
-        self.availableAlignments = availableAlignments
+        self.genders = genders
+        self.aligns = aligns
         self.onPlay = onPlay
         self.onQuit = onQuit
         _playerName = State(initialValue: initialName)
-        _selectedRaceID = State(initialValue: races.first(where: { $0.isAvailable })?.id)
-        _selectedRoleID = State(initialValue: roles.first(where: { $0.isAvailable })?.id)
-        _sex = State(initialValue: availableSexes.contains(.male) ? .male : .female)
-        _alignment = State(initialValue: availableAlignments.contains(.neutral) ? .neutral :
-                          availableAlignments.contains(.lawful) ? .lawful : .chaotic)
+
+        // Find an initial valid role/race/gender/align combination.
+        var ro = 0
+        while ro < roles.count && !NetHackBridge.isValid(role: ro) { ro += 1 }
+        var ra = 0
+        while ra < races.count && !NetHackBridge.isValid(race: ra, forRole: ro) { ra += 1 }
+        let g = genders.indices.first { NetHackBridge.isValid(gender: $0, forRole: ro, race: ra) } ?? 0
+        let a = aligns.indices.first  { NetHackBridge.isValid(align:  $0, forRole: ro, race: ra) } ?? 0
+
+        _selectedRoleIndex   = State(initialValue: ro < roles.count   ? ro : 0)
+        _selectedRaceIndex   = State(initialValue: ra < races.count   ? ra : 0)
+        _selectedGenderIndex = State(initialValue: g)
+        _selectedAlignIndex  = State(initialValue: a)
     }
+
+    // MARK: - Selection helpers
+
+    /// Called when the user picks a role.  Snaps race to the first valid choice
+    /// if it's no longer compatible, then snaps gender and alignment.
+    private func selectRole(_ ro: Int) {
+        selectedRoleIndex = ro
+        if !NetHackBridge.isValid(race: selectedRaceIndex, forRole: ro) {
+            selectedRaceIndex = races.indices.first {
+                NetHackBridge.isValid(race: $0, forRole: ro)
+            } ?? 0
+        }
+        snapGenderAndAlign()
+    }
+
+    /// Called when the user picks a race.  Snaps role to the first valid choice
+    /// if it's no longer compatible, then snaps gender and alignment.
+    private func selectRace(_ rc: Int) {
+        selectedRaceIndex = rc
+        if !NetHackBridge.isValid(race: rc, forRole: selectedRoleIndex) {
+            selectedRoleIndex = roles.indices.first {
+                NetHackBridge.isValid(race: rc, forRole: $0)
+            } ?? 0
+        }
+        snapGenderAndAlign()
+    }
+
+    /// After a role or race change, ensures gender and alignment are still valid
+    /// for the new combination, snapping to the first valid choice if not.
+    private func snapGenderAndAlign() {
+        let ro = selectedRoleIndex
+        let rc = selectedRaceIndex
+        if !NetHackBridge.isValid(gender: selectedGenderIndex, forRole: ro, race: rc) {
+            selectedGenderIndex = genders.indices.first {
+                NetHackBridge.isValid(gender: $0, forRole: ro, race: rc)
+            } ?? 0
+        }
+        if !NetHackBridge.isValid(align: selectedAlignIndex, forRole: ro, race: rc) {
+            selectedAlignIndex = aligns.indices.first {
+                NetHackBridge.isValid(align: $0, forRole: ro, race: rc)
+            } ?? 0
+        }
+    }
+
+    // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -88,82 +121,54 @@ struct PlayerSelectionView: View {
             .padding(.bottom, 12)
 
             // Three-column layout
-            HStack(alignment: .top, spacing: 0) {
-                // Left: Race list (shorter, top-aligned)
-                VStack(spacing: 0) {
-                    raceTable
-                        .frame(height: 197)
-                    Spacer(minLength: 0)
-                }
-                .frame(width: 134)
-                .padding(.trailing, 9)
-
-                // Middle: Role list (full height)
-                roleTable
-                    .frame(width: 158, height: 370)
-                    .padding(.trailing, 13)
-
-                // Right: Sex, Alignment, Play/Quit
+            HStack(alignment: .top, spacing: 12) {
+                racePanel
+                    .frame(width: 100)
+                rolePanel
+                    .frame(maxWidth: .infinity)
                 rightPanel
                     .frame(width: 108)
             }
             .padding(.horizontal, 17)
+            .padding(.bottom, 17)
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .frame(width: 456, height: 441)
+        .frame(width: 456)
     }
 
-    // MARK: - Race Table
+    // MARK: - Race Panel
 
-    private var raceTable: some View {
-        Table(races, selection: $selectedRaceID) {
-            TableColumn("Race") { race in
-                HStack(spacing: 4) {
-                    if let image = race.image {
-                        Image(nsImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                    }
-                    Text(race.name)
+    private var racePanel: some View {
+        GroupBox("Race") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(races.indices, id: \.self) { i in
+                    RadioButton(
+                        label: races[i].name.capitalized,
+                        isSelected: selectedRaceIndex == i,
+                        isEnabled: NetHackBridge.isValid(race: i, forRole: selectedRoleIndex),
+                        action: { selectRace(i) }
+                    )
                 }
-                .opacity(race.isAvailable ? 1.0 : 0.4)
             }
-        }
-        .alternatingRowBackgrounds(.disabled)
-        .border(Color(NSColor.separatorColor), width: 1)
-        .onChange(of: selectedRaceID) { _, newID in
-            guard let newID,
-                  let race = races.first(where: { $0.id == newID }),
-                  !race.isAvailable else { return }
-            selectedRaceID = nil
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    // MARK: - Role Table
+    // MARK: - Role Panel
 
-    private var roleTable: some View {
-        Table(roles, selection: $selectedRoleID) {
-            TableColumn("Role") { role in
-                HStack(spacing: 4) {
-                    if let image = role.image {
-                        Image(nsImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                    }
-                    Text(role.name)
+    private var rolePanel: some View {
+        GroupBox("Role") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(roles.indices, id: \.self) { i in
+                    RadioButton(
+                        label: roles[i].name,
+                        isSelected: selectedRoleIndex == i,
+                        isEnabled: NetHackBridge.isValid(race: selectedRaceIndex, forRole: i),
+                        action: { selectRole(i) }
+                    )
                 }
-                .opacity(role.isAvailable ? 1.0 : 0.4)
             }
-        }
-        .alternatingRowBackgrounds(.disabled)
-        .border(Color(NSColor.separatorColor), width: 1)
-        .onChange(of: selectedRoleID) { _, newID in
-            guard let newID,
-                  let role = roles.first(where: { $0.id == newID }),
-                  !role.isAvailable else { return }
-            selectedRoleID = nil
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -173,12 +178,12 @@ struct PlayerSelectionView: View {
         VStack(alignment: .leading, spacing: 0) {
             GroupBox("Sex") {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(PlayerSex.allCases) { option in
+                    ForEach(genders.indices, id: \.self) { i in
                         RadioButton(
-                            label: option.rawValue,
-                            isSelected: sex == option,
-                            isEnabled: availableSexes.contains(option),
-                            action: { sex = option }
+                            label: genders[i].name.capitalized,
+                            isSelected: selectedGenderIndex == i,
+                            isEnabled: NetHackBridge.isValid(gender: i, forRole: selectedRoleIndex, race: selectedRaceIndex),
+                            action: { selectedGenderIndex = i }
                         )
                     }
                 }
@@ -189,28 +194,28 @@ struct PlayerSelectionView: View {
 
             GroupBox("Alignment") {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(PlayerAlignment.allCases) { option in
+                    ForEach(aligns.indices, id: \.self) { i in
                         RadioButton(
-                            label: option.rawValue,
-                            isSelected: alignment == option,
-                            isEnabled: availableAlignments.contains(option),
-                            action: { alignment = option }
+                            label: aligns[i].name.capitalized,
+                            isSelected: selectedAlignIndex == i,
+                            isEnabled: NetHackBridge.isValid(align: i, forRole: selectedRoleIndex, race: selectedRaceIndex),
+                            action: { selectedAlignIndex = i }
                         )
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Spacer()
+            Spacer().frame(height: 16)
 
             VStack(spacing: 8) {
                 Button("Play") {
                     onPlay(PlayerSelection(
                         name: playerName,
-                        raceID: selectedRaceID,
-                        roleID: selectedRoleID,
-                        sex: sex,
-                        alignment: alignment
+                        raceID:   races.indices.contains(selectedRaceIndex)   ? races[selectedRaceIndex].id     : nil,
+                        roleID:   roles.indices.contains(selectedRoleIndex)   ? roles[selectedRoleIndex].id     : nil,
+                        genderID: genders.indices.contains(selectedGenderIndex) ? genders[selectedGenderIndex].id : nil,
+                        alignID:  aligns.indices.contains(selectedAlignIndex)  ? aligns[selectedAlignIndex].id   : nil
                     ))
                 }
                 .keyboardShortcut(.return, modifiers: [])
@@ -238,10 +243,10 @@ private struct RadioButton: View {
         Button(action: { if isEnabled { action() } }) {
             HStack(spacing: 6) {
                 Image(systemName: isSelected ? "circle.inset.filled" : "circle")
-                    .foregroundStyle(isSelected && isEnabled ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 Text(label)
-                    .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
             }
+            .opacity(isEnabled ? 1.0 : 0.35)
         }
         .buttonStyle(.plain)
     }
@@ -249,33 +254,40 @@ private struct RadioButton: View {
 
 // MARK: - Preview
 
-#Preview("All Available") {
+#Preview("Player Selection") {
     PlayerSelectionView(
         initialName: "Bryce",
         races: [
-            PlayerRaceOption(name: "human"),
-            PlayerRaceOption(name: "elf"),
-            PlayerRaceOption(name: "dwarf"),
-            PlayerRaceOption(name: "gnome"),
-            PlayerRaceOption(name: "orc"),
+            PlayerOption(name: "human"),
+            PlayerOption(name: "elf"),
+            PlayerOption(name: "dwarf"),
+            PlayerOption(name: "gnome"),
+            PlayerOption(name: "orc"),
         ],
         roles: [
-            PlayerRoleOption(name: "Archeologist"),
-            PlayerRoleOption(name: "Barbarian", isAvailable: false),
-            PlayerRoleOption(name: "Caveman"),
-            PlayerRoleOption(name: "Healer"),
-            PlayerRoleOption(name: "Knight", isAvailable: false),
-            PlayerRoleOption(name: "Monk", isAvailable: false),
-            PlayerRoleOption(name: "Priest", isAvailable: false),
-            PlayerRoleOption(name: "Rogue", isAvailable: false),
-            PlayerRoleOption(name: "Ranger"),
-            PlayerRoleOption(name: "Samurai", isAvailable: false),
-            PlayerRoleOption(name: "Tourist", isAvailable: false),
-            PlayerRoleOption(name: "Valkyrie", isAvailable: false),
-            PlayerRoleOption(name: "Wizard"),
+            PlayerOption(name: "Archeologist"),
+            PlayerOption(name: "Barbarian"),
+            PlayerOption(name: "Caveman"),
+            PlayerOption(name: "Healer"),
+            PlayerOption(name: "Knight"),
+            PlayerOption(name: "Monk"),
+            PlayerOption(name: "Priest"),
+            PlayerOption(name: "Rogue"),
+            PlayerOption(name: "Ranger"),
+            PlayerOption(name: "Samurai"),
+            PlayerOption(name: "Tourist"),
+            PlayerOption(name: "Valkyrie"),
+            PlayerOption(name: "Wizard"),
         ],
-        availableSexes: Set(PlayerSex.allCases),
-        availableAlignments: [.neutral],
+        genders: [
+            PlayerOption(name: "male"),
+            PlayerOption(name: "female"),
+        ],
+        aligns: [
+            PlayerOption(name: "lawful"),
+            PlayerOption(name: "neutral"),
+            PlayerOption(name: "chaotic"),
+        ],
         onPlay: { _ in },
         onQuit: { }
     )
