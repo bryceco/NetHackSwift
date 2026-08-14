@@ -1,8 +1,20 @@
 import AppKit
 import SwiftUI
 
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var controller: NetHackController?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let controller, controller.isInitialized else { return .terminateNow }
+        controller.saveAndQuit()
+        // NetHack calls exit() after saving, which terminates the process.
+        return .terminateLater
+    }
+}
+
 @main
 struct NetHackSwiftApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     private let gameState = GameState()
     private let controller: NetHackController?
 
@@ -52,6 +64,7 @@ struct NetHackSwiftApp: App {
         c.start(playgroundURL: playgroundURL,
 				resourcesURL: resourcesURL)
         controller = c
+        appDelegate.controller = c
     }
 
     var body: some Scene {

@@ -101,9 +101,6 @@ private struct NHMenuItem {
         keyboard.isWaitingForInput = { [weak self] in
             self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil || self?.isShowingMessageModal == true
         }
-        keyboard.onSaveAndQuit = { [weak self] in
-            self?.sendKey(Int32(UInt8(ascii: "S")))
-        }
         keyboard.onKey = { [weak self] key in
             guard let self else { return }
             if self.isShowingMessageModal {
@@ -131,6 +128,11 @@ private struct NHMenuItem {
 				   completion: { exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
         })
+    }
+
+    /// Send the save-and-quit command to NetHack. NetHack will save and call exit().
+    func saveAndQuit() {
+        sendKey(Int32(UInt8(ascii: "S")))
     }
 
     /// Forward a keypress to whichever blocking key-input request is pending,

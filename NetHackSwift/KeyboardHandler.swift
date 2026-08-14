@@ -8,8 +8,6 @@ import AppKit
 final class KeyboardHandler {
     /// Called when a key should be forwarded to NetHack.
     var onKey: ((Int32) -> Void)?
-    /// Called when Cmd-Q is pressed.
-    var onSaveAndQuit: (() -> Void)?
     /// Returns true when NetHack is currently blocking for key input.
     var isWaitingForInput: (() -> Bool)?
 
@@ -25,14 +23,7 @@ final class KeyboardHandler {
             let isArrow = Self.arrowKeyCodes.contains(keyCode)
 
             if event.type == .keyDown {
-                // Cmd-Q: ask NetHack to save, then auto-confirm and terminate.
-                if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                   event.characters == "q"
-                {
-                    self.onSaveAndQuit?()
-                    return nil
-                }
-                // Let other Command-key shortcuts (Cmd-H, Cmd-W, …) reach the app menu.
+                // Let Command-key shortcuts (Cmd-Q, Cmd-H, Cmd-W, …) reach the app menu.
                 if event.modifierFlags.contains(.command) { return event }
 
                 if let mapping = Self.numpadKeyMap[keyCode] {
