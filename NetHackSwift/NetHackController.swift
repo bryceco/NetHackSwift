@@ -76,6 +76,10 @@ private struct NHMenuItem {
     @ObservationIgnored private let keyboard = KeyboardHandler()
     // Set when Cmd-Q triggers a save-and-quit; auto-confirms the "Really save?" prompt.
     @ObservationIgnored private var isSavingAndQuitting = false
+    // Key pressed while a message modal was open; consumed by the next needKeyInput/needKeyOrMouseInput.
+    @ObservationIgnored private var pendingPassthroughKey: Int32?
+    // True while a blocking message/text modal is running.
+    @ObservationIgnored private var isShowingMessageModal = false
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -96,14 +100,25 @@ private struct NHMenuItem {
         bridge = isPreview ? nil : NetHackBridge()
         super.init()
         keyboard.isWaitingForInput = { [weak self] in
-            self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil
+            self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil || self?.isShowingMessageModal == true
         }
         keyboard.onSaveAndQuit = { [weak self] in
             self?.isSavingAndQuitting = true
             self?.sendKey(Int32(UInt8(ascii: "S")))
         }
         keyboard.onKey = { [weak self] key in
-            self?.sendKey(key)
+            guard let self else { return }
+            if self.isShowingMessageModal {
+                // ESC and Return close the modal without passing the key through.
+                // Any other key is forwarded as the next game keystroke.
+                let asciiReturn: Int32 = 13
+                if key != asciiESC && key != asciiReturn {
+                    self.pendingPassthroughKey = key
+                }
+                NSApp.stopModal()
+            } else {
+                self.sendKey(key)
+            }
         }
     }
 
@@ -262,7 +277,9 @@ extension NetHackController: NetHackBridgeDelegate {
             panel.contentViewController = hc
             panel.contentMinSize = CGSize(width: 259, height: 100)
             if blocking {
+                isShowingMessageModal = true
                 NSApp.runModal(for: panel)
+                isShowingMessageModal = false
                 panel.close()
                 nhWindows.removeValue(forKey: window)
             } else {
@@ -508,11 +525,21 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func needKeyInput(_ completion: @escaping (Int32) -> Void) {
+        if let key = pendingPassthroughKey {
+            pendingPassthroughKey = nil
+            completion(key)
+            return
+        }
         keyboard.resetDirectionState()
         pendingKeyCompletion = completion
     }
 
     func needKeyOrMouseInput(_ completion: @escaping (Int32, Int32, Int32, Int32) -> Void) {
+        if let key = pendingPassthroughKey {
+            pendingPassthroughKey = nil
+            completion(key, 0, 0, 0)
+            return
+        }
         keyboard.resetDirectionState()
         pendingKeyOrMouseCompletion = completion
     }
