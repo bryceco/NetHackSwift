@@ -92,18 +92,27 @@ final class TileSet {
 
 	/// Returns a cached CGImage for the tile at `tileidx`.
 	/// Crops from the sprite sheet on first access and caches the result.
-	func cgImage(forGlyph glyph: nhswift_glyph) -> CGImage? {
-		guard glyph.glyph >= 0 else { return nil }
-		let tile = Int(glyph.gm.tileidx)
+	func cgImage(forTile tile: Int) -> CGImage? {
 		if let cached = cgImageCache[tile] { return cached }
 		guard let cropped = cgSource.cropping(to: cgRect(forTile: tile)) else { return nil }
 		cgImageCache[tile] = cropped
 		return cropped
 	}
 
+	func cgImage(forGlyph glyph: nhswift_glyph) -> CGImage? {
+		guard glyph.glyph >= 0 else { return nil }
+		return cgImage(forTile: Int(glyph.gm.tileidx))
+	}
+
 	/// Returns an NSImage for the tile — wraps cgImage(forGlyph:) for callers that need NSImage.
 	func image(forGlyph glyph: nhswift_glyph) -> NSImage? {
 		guard let cg = cgImage(forGlyph: glyph) else { return nil }
 		return NSImage(cgImage: cg, size: tileSize)
+	}
+
+	func cgImage(forGlyph glyph: Int) -> CGImage? {
+		guard glyph >= 0 else { return nil }
+		let tile = NetHackBridge.tileIndex(forGlyph: glyph)
+		return cgImage(forTile: tile)
 	}
 }
