@@ -74,8 +74,6 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
     @ObservationIgnored private let keyboard = KeyboardHandler()
-    // Set when Cmd-Q triggers a save-and-quit; auto-confirms the "Really save?" prompt.
-    @ObservationIgnored private var isSavingAndQuitting = false
     // Keys pressed before NetHack has asked for input (e.g. during a message modal).
     // Consumed in FIFO order by the next needKeyInput/needKeyOrMouseInput.
     @ObservationIgnored private var pendingKeyInputQueue: [Int32] = []
@@ -104,7 +102,6 @@ private struct NHMenuItem {
             self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil || self?.isShowingMessageModal == true
         }
         keyboard.onSaveAndQuit = { [weak self] in
-            self?.isSavingAndQuitting = true
             self?.sendKey(Int32(UInt8(ascii: "S")))
         }
         keyboard.onKey = { [weak self] key in
@@ -131,11 +128,8 @@ private struct NHMenuItem {
 		print("Playground at \(playgroundURL.path)")
         bridge.run(withHackdirURL: resourcesURL,
 				   playgroundURL: playgroundURL,
-				   completion: { [weak self] exitCode in
+				   completion: { exitCode in
             print("--- NetHack exited (\(exitCode)) ---")
-            if self?.isSavingAndQuitting == true {
-                DispatchQueue.main.async { NSApp.terminate(nil) }
-            }
         })
     }
 
@@ -611,15 +605,6 @@ extension NetHackController: NetHackBridgeDelegate {
 
         // Fallback: print the question with choices and default to the messages window,
         // then wait for a valid keystroke.
-        var text = query
-        if !responses.isEmpty {
-            text += " [\(responses)]"
-        }
-        if defaultResponse != 0,
-		   let scalar = Unicode.Scalar(UInt32(defaultResponse))
-		{
-            text += " (\(Character(scalar)))"
-        }
         gameState?.messages.append(query)
 
         func waitForValidKey() {
