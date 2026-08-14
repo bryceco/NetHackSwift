@@ -129,15 +129,14 @@ extension YesNoWindowView {
     static let knownLabels: [String: [Character: String]] = [
         "yn":  ["y": "Yes", "n": "No"],
         "ynq": ["y": "Yes", "n": "No", "q": "Quit"],
-        "lr":  ["r": "Right", "l": "Left"],
+        "lr":  ["l": "Left", "r": "Right"],
     ]
 
-    static func makeButtons(from responses: String) -> [(label: String, value: Int32)] {
-        let (items, _) = parseYnChoices(responses)
-        let labelMap = knownLabels[items] ?? [:]
-        return items.unicodeScalars.map { scalar in
+    static func makeButtons(from responses: String) -> [(label: String, value: Int32)]? {
+		guard let labelMap = knownLabels[responses] else { return nil }
+        return responses.unicodeScalars.map { scalar in
             let char = Character(scalar)
-            let label = labelMap[char] ?? String(char).uppercased()
+            let label = labelMap[char]!
             return (label: label, value: Int32(scalar.value))
         }
     }
@@ -148,7 +147,7 @@ extension YesNoWindowView {
 #Preview("Yes / No") {
     YesNoWindowView(
         question: "Do you want to eat the food?",
-        buttons: YesNoWindowView.makeButtons(from: "yn"),
+        buttons: YesNoWindowView.makeButtons(from: "yn")!,
         defaultValue: Int32(UInt8(ascii: "n")),
         cancelValue: 0,
         onSelect: { _ in }
@@ -158,7 +157,7 @@ extension YesNoWindowView {
 #Preview("Yes / No / Quit") {
     YesNoWindowView(
         question: "There is a scroll of remove curse here; pick it up?",
-        buttons: YesNoWindowView.makeButtons(from: "ynq"),
+        buttons: YesNoWindowView.makeButtons(from: "ynq")!,
         defaultValue: Int32(UInt8(ascii: "n")),
         cancelValue: Int32(UInt8(ascii: "q")),
         onSelect: { _ in }

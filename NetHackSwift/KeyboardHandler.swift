@@ -72,7 +72,7 @@ final class KeyboardHandler {
 
     /// Clears accumulated arrow-key state. Call at the start of each new blocking
     /// input request so stale state cannot corrupt the next chord.
-    func resetDirectionState() {
+    func resetChordState() {
         pressedDirectionKeys.removeAll()
         pendingDirectionKeys.removeAll()
     }

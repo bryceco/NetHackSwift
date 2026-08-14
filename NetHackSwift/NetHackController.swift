@@ -530,7 +530,7 @@ extension NetHackController: NetHackBridgeDelegate {
             completion(key)
             return
         }
-        keyboard.resetDirectionState()
+        keyboard.resetChordState()
         pendingKeyCompletion = completion
     }
 
@@ -540,71 +540,101 @@ extension NetHackController: NetHackBridgeDelegate {
             completion(key, 0, 0, 0)
             return
         }
-        keyboard.resetDirectionState()
+        keyboard.resetChordState()
         pendingKeyOrMouseCompletion = completion
     }
 
     func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
-        print("yn_function: \(query) [\(responses)]")
-        if isSavingAndQuitting {
+        // Auto-confirm specific questions without showing any UI.
+        let alwaysYes = ["Really save?", "Overwrite the old file?"]
+        if alwaysYes.contains(query) {
             completion(Int32(UInt8(ascii: "y")))
             return
         }
 
         // Direction questions get a dedicated direction-picker panel.
-		if responses.isEmpty && query.lowercased().contains("direction") {
+        if responses.isEmpty && query.lowercased().contains("direction") {
             showDirectionModal(completion: completion)
             return
         }
 
+		#if false
+		// this function is really broken, and I'm not sure we even use it
         let (items, specials) = YesNoWindowView.parseYnChoices(responses)
+		#endif
 
-        // For known sequences the button labels are self-explanatory, so strip the
-        // embedded "[y/n/…]" hint from the question. For unknown sequences keep it —
-        // the brackets are the only indication of what each character means.
-        let displayQuestion = YesNoWindowView.knownLabels[items] != nil
-            ? Self.strippingBracketedContent(query)
-            : query
-
+		#if false
         // Multi-item list with '?' option: let NetHack show its own comprehensive list.
         if specials.contains("?") && items.count > 1 {
             completion(Int32(UInt8(ascii: "?")))
             return
         }
+		#endif
 
-        // Show a Yes/No panel for simple choices like "yn", "ynq", "rl".
-        let buttons = YesNoWindowView.makeButtons(from: responses)
-        // Cancel (ESC and close button) is only supported when 'q' is a valid response.
-        let cancelValue: Int32 = items.contains("q") ? Int32(UInt8(ascii: "q")) : 0
-        var styleMask: NSWindow.StyleMask = [.titled, .utilityWindow]
-        if cancelValue != 0 {
-			styleMask.insert(.closable)
-		}
-        let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
-            styleMask: styleMask,
-            backing: .buffered,
-            defer: false
-        )
-        panel.animationBehavior = .none
-        panel.isRestorable = false
-        panel.isReleasedWhenClosed = false
-        var result: Int32 = cancelValue
-        let view = YesNoWindowView(
-            question: displayQuestion,
-            buttons: buttons,
-            defaultValue: defaultResponse,
-            cancelValue: cancelValue,
-            onSelect: { value in
-                result = value
-                NSApp.stopModal()
+        // Well-known answer sets (yn, ynq, lr) get a modal button panel.
+        if let buttons = YesNoWindowView.makeButtons(from: responses) {
+            // Strip the embedded "[y/n/…]" hint — the button labels make it redundant.
+            let displayQuestion = Self.strippingBracketedContent(query)
+            // Cancel (ESC and close button) is only supported when 'q' is a valid response.
+            let cancelValue: Int32 = responses.contains("q") ? Int32(UInt8(ascii: "q")) : 0
+            var styleMask: NSWindow.StyleMask = [.titled, .utilityWindow]
+            if cancelValue != 0 { styleMask.insert(.closable) }
+            let panel = KeyablePanel(
+                contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
+                styleMask: styleMask,
+                backing: .buffered,
+                defer: false
+            )
+            panel.animationBehavior = .none
+            panel.isRestorable = false
+            panel.isReleasedWhenClosed = false
+            var result: Int32 = cancelValue
+            let view = YesNoWindowView(
+                question: displayQuestion,
+                buttons: buttons,
+                defaultValue: defaultResponse,
+                cancelValue: cancelValue,
+                onSelect: { value in
+                    result = value
+                    NSApp.stopModal()
+                }
+            )
+            let hc = NSHostingController(rootView: view)
+            panel.contentViewController = hc
+            NSApp.runModal(for: panel)
+            panel.close()
+            completion(result)
+            return
+        }
+
+        // Fallback: print the question with choices and default to the messages window,
+        // then wait for a valid keystroke.
+        var text = query
+        if !responses.isEmpty {
+            text += " [\(responses)]"
+        }
+        if defaultResponse != 0,
+		   let scalar = Unicode.Scalar(UInt32(defaultResponse))
+		{
+            text += " (\(Character(scalar)))"
+        }
+        gameState?.messages.append(query)
+
+        func waitForValidKey() {
+            keyboard.resetChordState()
+            pendingKeyCompletion = { key in
+                let asciiReturn: Int32 = 13
+                if key == asciiReturn && defaultResponse != 0 {
+                    completion(defaultResponse)
+                } else if responses.isEmpty || responses.unicodeScalars.contains(where: { Int32($0.value) == key }) {
+                    completion(key)
+                } else {
+                    // Invalid key — keep waiting.
+                    waitForValidKey()
+                }
             }
-        )
-        let hc = NSHostingController(rootView: view)
-        panel.contentViewController = hc
-        NSApp.runModal(for: panel)
-        panel.close()
-        completion(result)
+        }
+        waitForValidKey()
     }
 
     private func showDirectionModal(completion: @escaping (Int32) -> Void) {
