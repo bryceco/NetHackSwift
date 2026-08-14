@@ -130,6 +130,7 @@ extension YesNoWindowView {
         "yn":  ["y": "Yes", "n": "No"],
         "ynq": ["y": "Yes", "n": "No", "q": "Quit"],
         "lr":  ["l": "Left", "r": "Right"],
+		"ynr": ["y": "Destroy", "n": "Cancel", "r": "Recover"],
     ]
 
     static func makeButtons(from responses: String) -> [(label: String, value: Int32)]? {
