@@ -5,7 +5,7 @@ import SwiftUI
 struct DirectionView: View {
     let onKey: (Int32) -> Void
 
-    private let buttonSize: CGFloat = 24
+    private let buttonSize: CGFloat = 32
     private let gridGap: CGFloat = 4
 
     var body: some View {
@@ -13,23 +13,23 @@ struct DirectionView: View {
         // corresponding row of arrow buttons without any manual frame math.
         Grid(horizontalSpacing: gridGap, verticalSpacing: gridGap) {
             GridRow {
-                arrowButton("arrow.up.left",   key: "y")
-                arrowButton("arrow.up",        key: "k")
-                arrowButton("arrow.up.right",  key: "u")
+                arrowButton("Arrow-NW", key: "y")
+                arrowButton("Arrow-N",  key: "k")
+                arrowButton("Arrow-NE", key: "u")
                 dividerCell
                 textButton("Ceiling <", key: "<")
             }
             GridRow {
-                arrowButton("arrow.left",  key: "h")
+                arrowButton("Arrow-W",  key: "h")
                 Color.clear.frame(width: buttonSize, height: buttonSize)
-                arrowButton("arrow.right", key: "l")
+                arrowButton("Arrow-E",  key: "l")
                 dividerCell
                 textButton("Self .",    key: ".")
             }
             GridRow {
-                arrowButton("arrow.down.left",  key: "b")
-                arrowButton("arrow.down",       key: "j")
-                arrowButton("arrow.down.right", key: "n")
+                arrowButton("Arrow-SW", key: "b")
+                arrowButton("Arrow-S",  key: "j")
+                arrowButton("Arrow-SE", key: "n")
                 dividerCell
                 textButton("Floor >",  key: ">")
             }
@@ -47,12 +47,12 @@ struct DirectionView: View {
             .padding(.horizontal, 7)
     }
 
-    private func arrowButton(_ systemImage: String, key: String) -> some View {
+    private func arrowButton(_ assetName: String, key: String) -> some View {
         Button {
             send(key)
         } label: {
-            Image(systemName: systemImage)
-                .imageScale(.small)
+            Image(assetName)
+                .resizable()
                 .frame(width: buttonSize, height: buttonSize)
         }
         .buttonStyle(.bordered)
