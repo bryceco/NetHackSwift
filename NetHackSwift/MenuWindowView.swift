@@ -65,10 +65,10 @@ struct MenuWindowView: View {
     @ViewBuilder
     private var itemList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(displayCategories) { category in
+            ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                 Text(category.title)
                     .font(.headline)
-                    .padding(.top, 8)
+                    .padding(.top, index == 0 ? 2 : 8)
                     .padding(.bottom, 2)
                     .padding(.horizontal, 20)
 
@@ -99,6 +99,7 @@ struct MenuWindowView: View {
                 }
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.bottom, 8)
     }
 
@@ -112,17 +113,20 @@ struct MenuWindowView: View {
                     Text("Abc").font(.system(size: 12).italic())
                 }
                 .toggleStyle(.button)
+                .controlSize(.mini)
             }
             .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .padding(.top, 4)
+            .padding(.bottom, -20)   // cancel the button style's intrinsic bottom inset
 
-            // ViewThatFits tries the plain VStack first (no scroll, window sizes to
-            // content). If the content is taller than maxScrollHeight it falls back
-            // to the ScrollView automatically — single-pass, no preference keys.
-            ViewThatFits(in: .vertical) {
+            // ScrollView sizes to its content up to maxScrollHeight when SwiftUI
+            // computes the ideal size for preferredContentSize. ViewThatFits was
+            // removed because it produces an infinite constraint-update loop inside
+            // NSHostingController when the window is presented modally.
+            ScrollView {
                 itemList
-                ScrollView { itemList }
             }
+            .contentMargins(.top, 0, for: .scrollContent)
             .frame(maxHeight: maxScrollHeight)
 
             Divider()
@@ -154,6 +158,7 @@ struct MenuWindowView: View {
         }
         .frame(minWidth: 250, minHeight: 100)
         .focusable()
+        .focusEffectDisabled()
         .focused($isFocused)
         .onAppear { isFocused = true }
         .onKeyPress { press in
@@ -201,16 +206,16 @@ private struct MenuItemRow: View {
                         .labelsHidden()
                 }
 
-                Text("(\(item.key))")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, alignment: .leading)
-
                 if let image = item.image {
                     Image(nsImage: image)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 32, height: 32)
                 }
+
+                Text("(\(item.key))")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, alignment: .leading)
 
                 Text(item.text)
 

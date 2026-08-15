@@ -58,6 +58,7 @@ private struct NHMenuItem {
     var color: Int32
     var string: String
     var flags: UInt32
+	var glyph: Int32
     var identifier: UInt  // anything value (as uintptr_t) passed through from addMenu
 }
 
@@ -342,14 +343,15 @@ extension NetHackController: NetHackBridgeDelegate {
         windowData[window]!.menuBehavior = behavior
     }
 
-    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyphInfo: UnsafeRawPointer, identifier: UInt) {
+    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyph: Int32, identifier: UInt) {
         windowData[window]!.menuItems.append(NHMenuItem(
             accel: accel,
             groupAccel: groupAccel,
             attr: attr,
             color: color,
             string: string,
-            flags: flags,
+			flags: flags,
+			glyph: glyph,
             identifier: identifier
         ))
     }
@@ -673,13 +675,14 @@ extension NetHackController: NetHackBridgeDelegate {
 					how: Int32,
                     completion: @escaping ([NHMenuSelection]?) -> Void) {
         let selectionMode: MenuSelectionMode = how == 0 ? .none : how == 1 ? .one : .any
-        showMenuWindow(
-            window: window,
-            selectionMode: selectionMode,
-            onAccept: { selected in
-                completion(selected.map { NHMenuSelection(identifier: $0.identifier, count: 1) })
-            },
-            onCancel: { completion(nil) }
+        showMenuWindow(window: window,
+					   selectionMode: selectionMode,
+					   onAccept: { selected in
+							completion(selected.map { NHMenuSelection(identifier: $0.identifier, count: 1) })
+						},
+					   onCancel: {
+							completion(nil)
+						}
         )
     }
 
@@ -691,9 +694,11 @@ extension NetHackController: NetHackBridgeDelegate {
                                 onCancel: (() -> Void)?)
 	{
 		let data = windowData[window]!
+        let tileSet = TileSet.shared
         let items = data.menuItems.map { item in
             MenuItemData(
                 key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
+                image: tileSet?.image(forGlyph: Int(item.glyph)),
                 text: item.string,
                 identifier: item.identifier
             )
@@ -705,7 +710,7 @@ extension NetHackController: NetHackBridgeDelegate {
             backing: .buffered,
             defer: false
         )
-        nsWindow.title = data.menuTitle.isEmpty ? "Menu" : data.menuTitle
+        nsWindow.titleVisibility = .hidden
         nsWindow.animationBehavior = .none
         nsWindow.isRestorable = false
         nsWindow.isReleasedWhenClosed = false
@@ -719,10 +724,21 @@ extension NetHackController: NetHackBridgeDelegate {
             onCancel: { NSApp.stopModal() }
         )
         let hc = NSHostingController(rootView: view)
-        hc.sizingOptions = .preferredContentSize
         nsWindow.contentViewController = hc
-        nsWindow.contentMinSize = CGSize(width: 250, height: 100)
+        nsWindow.contentMinSize = CGSize(width: 300, height: 100)
+        // Use fittingSize for a one-shot measurement before runModal.
+        // preferredContentSize cannot be used: its getter calls setNeedsUpdateConstraints
+        // internally, which re-enters the constraint solver during the modal run loop
+        // and causes an infinite update cycle that crashes.
+        let fitting = hc.view.fittingSize
+        let maxH = (NSScreen.main?.visibleFrame.height ?? 800) * 0.7
+        nsWindow.setContentSize(CGSize(
+            width:  max(fitting.width, 300),
+            height: max(min(fitting.height, maxH), 100)
+        ))
+        nsWindow.center()
         NSApp.runModal(for: nsWindow)
+        nsWindow.close()
         if let accepted {
             onAccept?(accepted)
         } else {
