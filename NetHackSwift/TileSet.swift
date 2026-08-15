@@ -121,3 +121,33 @@ final class TileSet {
 		return NSImage(cgImage: cg, size: tileSize)
 	}
 }
+
+// MARK: - NHColor -> NSColor
+
+extension NHColor {
+    /// Maps a NetHack CLR_* color value to its nearest NSColor equivalent.
+    /// The palette approximates the classic 16-color ANSI terminal palette.
+    /// NHColorNone (NO_COLOR) returns nil — let the caller apply its default.
+    func nsColor() -> NSColor? {
+        switch self {
+        case .black:         return NSColor(red: 0.20, green: 0.20, blue: 0.20, alpha: 1)
+        case .red:           return NSColor(red: 0.72, green: 0.07, blue: 0.07, alpha: 1)
+        case .green:         return NSColor(red: 0.07, green: 0.55, blue: 0.07, alpha: 1)
+        case .brown:         return NSColor(red: 0.60, green: 0.35, blue: 0.07, alpha: 1)
+        case .blue:          return NSColor(red: 0.07, green: 0.07, blue: 0.72, alpha: 1)
+        case .magenta:       return NSColor(red: 0.60, green: 0.07, blue: 0.60, alpha: 1)
+        case .cyan:          return NSColor(red: 0.07, green: 0.55, blue: 0.55, alpha: 1)
+        case .gray:          return NSColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1)
+        case .none:          return nil
+        case .orange:        return NSColor(red: 1.00, green: 0.55, blue: 0.00, alpha: 1)
+        case .brightGreen:   return NSColor(red: 0.00, green: 0.80, blue: 0.00, alpha: 1)
+        case .yellow:        return NSColor(red: 0.80, green: 0.80, blue: 0.00, alpha: 1)
+        case .brightBlue:    return NSColor(red: 0.30, green: 0.30, blue: 1.00, alpha: 1)
+        case .brightMagenta: return NSColor(red: 0.90, green: 0.10, blue: 0.90, alpha: 1)
+        case .brightCyan:    return NSColor(red: 0.00, green: 0.85, blue: 0.85, alpha: 1)
+        case .white:         return .white
+        @unknown default:    return nil
+        }
+    }
+}
+

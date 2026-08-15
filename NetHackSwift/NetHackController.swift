@@ -55,7 +55,7 @@ private struct NHMenuItem {
     var accel: CChar
     var groupAccel: CChar
     var attr: Int32
-    var color: Int32
+    var color: NHColor
     var string: String
     var flags: UInt32
 	var glyph: Int32
@@ -343,7 +343,7 @@ extension NetHackController: NetHackBridgeDelegate {
         windowData[window]!.menuBehavior = behavior
     }
 
-    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: Int32, string: String, flags: UInt32, glyph: Int32, identifier: UInt) {
+    func addMenuItem(in window: NHWindowID, accel: CChar, groupAccel: CChar, attr: Int32, color: NHColor, string: String, flags: UInt32, glyph: Int32, identifier: UInt) {
         windowData[window]!.menuItems.append(NHMenuItem(
             accel: accel,
             groupAccel: groupAccel,
@@ -700,6 +700,7 @@ extension NetHackController: NetHackBridgeDelegate {
                 key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
                 image: tileSet?.image(forGlyph: Int(item.glyph)),
                 text: item.string,
+				color: item.color.nsColor() ?? .black,
                 identifier: item.identifier
             )
         }

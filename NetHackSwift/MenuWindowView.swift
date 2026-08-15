@@ -19,6 +19,7 @@ struct MenuItemData: Identifiable {
     var key: String         // inventory letter, e.g. "a"
     var image: NSImage?
     var text: String
+	var color: NSColor = .black
     var identifier: UInt = 0  // anything value (as uintptr_t) passed to addMenu / returned from selectMenu
 }
 
