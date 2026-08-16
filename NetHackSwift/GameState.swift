@@ -6,7 +6,7 @@ import Observation
 final class GameState {
     // Player identity
     var playerName: String = ""
-    var role: String = ""
+    var alignRaceRole: String = ""
     var dlvl: String = ""
 
     // Hit points

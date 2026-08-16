@@ -390,10 +390,11 @@ extension NetHackController: NetHackBridgeDelegate {
         case .time:      state.turn          = intVal
         case .hp:        state.hp            = intVal
         case .hpMax:     state.maxHp         = intVal
+        case .align:     state.alignRaceRole = text ?? ""
         case .levelDesc: state.dlvl          = text ?? ""
         case .exp:       state.xp            = intVal
         case .condition: state.statusEffects = statusEffectsString(from: condBits)
-        default: break  // align, score, cap, hd, hunger, weapon, armor, terrain, version,
+        default: break  // score, cap, hd, hunger, weapon, armor, terrain, version,
                         // flush, reset, characteristics
         }
     }

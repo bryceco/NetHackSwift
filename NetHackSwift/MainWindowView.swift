@@ -30,7 +30,7 @@ struct MainWindowView: View {
 #Preview {
     let state = GameState()
     state.playerName = "Vlad the Enchanter"
-    state.role = "Neutral Human Wizard"
+    state.alignRaceRole = "Neutral Human Wizard"
     state.dlvl = "The Astral Plane"
     state.hp = 222; state.maxHp = 333
     state.pw = 222; state.maxPw = 333
