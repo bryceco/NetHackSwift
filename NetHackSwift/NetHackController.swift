@@ -362,11 +362,11 @@ extension NetHackController: NetHackBridgeDelegate {
 
     // MARK: Status bar
 
-    func enableStatusField(_ fieldIndex: Int32, name: String, format: String, enabled: Bool) {
+    func enable(_ fieldIndex: NHStatusField, name: String, format: String, enabled: Bool) {
         // nothing to do
     }
 
-    func updateStatusField(_ fieldIndex: Int32, text: String?, condBits: Int, change: Int32, percent: Int32, color: Int32, colorMasks: UnsafePointer<UInt>?) {
+    func update(_ fieldIndex: NHStatusField, text: String?, condBits: Int, change: Int32, percent: Int32, color: NHColor, colorMasks: UnsafePointer<UInt>?) {
         guard let state = gameState else { return }
         // Parse text as Int, skipping any leading non-numeric prefix (e.g. "$:" on gold).
         let intVal: Int = {
@@ -375,26 +375,26 @@ extension NetHackController: NetHackBridgeDelegate {
             return Int(s) ?? 0
         }()
         switch fieldIndex {
-        case  0: state.playerName   = text ?? ""                        // BL_TITLE
-        case  1: state.str          = text ?? ""                        // BL_STR (may be "18/01")
-        case  2: state.dex          = intVal                            // BL_DX
-        case  3: state.con          = intVal                            // BL_CO
-        case  4: state.int_         = intVal                            // BL_IN
-        case  5: state.wis          = intVal                            // BL_WI
-        case  6: state.cha          = intVal                            // BL_CH
-        case 10: state.gold         = intVal                            // BL_GOLD
-        case 11: state.pw           = intVal                            // BL_ENE
-        case 12: state.maxPw        = intVal                            // BL_ENEMAX
-        case 13: state.level        = intVal                            // BL_XP (experience level)
-        case 14: state.ac           = intVal                            // BL_AC
-        case 16: state.turn         = intVal                            // BL_TIME
-        case 18: state.hp           = intVal                            // BL_HP
-        case 19: state.maxHp        = intVal                            // BL_HPMAX
-        case 20: state.dlvl         = text ?? ""                        // BL_LEVELDESC
-        case 21: state.xp           = intVal                            // BL_EXP
-        case 22: state.statusEffects = statusEffectsString(from: condBits) // BL_CONDITION
-        default: break  // BL_ALIGN, BL_SCORE, BL_CAP, BL_HD, BL_HUNGER,
-                        // BL_WEAPON, BL_ARMOR, BL_TERRAIN, BL_VERS, flush/reset
+        case .title:     state.playerName    = text ?? ""
+        case .str:       state.str           = text ?? ""               // may be "18/01"
+        case .dex:       state.dex           = intVal
+        case .con:       state.con           = intVal
+        case .int:       state.int_          = intVal
+        case .wis:       state.wis           = intVal
+        case .cha:       state.cha           = intVal
+        case .gold:      state.gold          = intVal
+        case .energy:    state.pw            = intVal
+        case .energyMax: state.maxPw         = intVal
+        case .xp:        state.level         = intVal
+        case .ac:        state.ac            = intVal
+        case .time:      state.turn          = intVal
+        case .hp:        state.hp            = intVal
+        case .hpMax:     state.maxHp         = intVal
+        case .levelDesc: state.dlvl          = text ?? ""
+        case .exp:       state.xp            = intVal
+        case .condition: state.statusEffects = statusEffectsString(from: condBits)
+        default: break  // align, score, cap, hd, hunger, weapon, armor, terrain, version,
+                        // flush, reset, characteristics
         }
     }
 
