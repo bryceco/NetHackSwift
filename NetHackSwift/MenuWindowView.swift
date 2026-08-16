@@ -68,7 +68,7 @@ struct MenuWindowView: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                 Text(category.title)
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .bold))
                     .padding(.top, index == 0 ? 2 : 8)
                     .padding(.bottom, 2)
                     .padding(.horizontal, 20)
@@ -84,7 +84,6 @@ struct MenuWindowView: View {
                                 get: { selectedIDs.contains(item.id) },
                                 set: { selected in
                                     if selected {
-                                        // Radio buttons allow only one selection at a time.
                                         if selectionMode == .one {
                                             selectedIDs = [item.id]
                                         } else {
@@ -94,7 +93,8 @@ struct MenuWindowView: View {
                                         selectedIDs.remove(item.id)
                                     }
                                 }
-                            )
+                            ),
+                            onActivate: selectionMode == .one ? { onAccept([item]) } : nil
                         )
                     }
                 }
@@ -145,7 +145,12 @@ struct MenuWindowView: View {
                         .keyboardShortcut(.return, modifiers: [])
                         .keyboardShortcut(.escape, modifiers: [])
                         .buttonStyle(.borderedProminent)
-                case .one, .any:
+                case .one:
+                    Button("Close", action: onCancel)
+                        .keyboardShortcut(.return, modifiers: [])
+                        .keyboardShortcut(.escape, modifiers: [])
+                        .buttonStyle(.borderedProminent)
+                case .any:
                     Button("Cancel", action: onCancel)
                         .keyboardShortcut(.escape, modifiers: [])
                     Button("Accept") { onAccept(selectedItems) }
@@ -168,7 +173,7 @@ struct MenuWindowView: View {
                   let item = allItems.first(where: { $0.key == String(char) })
             else { return .ignored }
             if selectionMode == .one {
-                selectedIDs = [item.id]
+                onAccept([item])
             } else {
                 if selectedIDs.contains(item.id) {
                     selectedIDs.remove(item.id)
@@ -187,20 +192,20 @@ private struct MenuItemRow: View {
     let item: MenuItemData
     let selectionMode: MenuSelectionMode
     @Binding var isSelected: Bool
+    var onActivate: (() -> Void)? = nil
+
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 8) {
             if item.key.isEmpty {
-                // Informational row: no control or key slot; text aligns with radio buttons above.
+                // Informational row: no control or key slot; text aligns with items above.
                 Text(item.text)
                 Spacer()
             } else {
                 switch selectionMode {
-                case .none:
+                case .none, .one:
                     EmptyView()
-                case .one:
-                    Image(systemName: isSelected ? "circle.inset.filled" : "circle")
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 case .any:
                     Toggle("", isOn: $isSelected)
                         .toggleStyle(.checkbox)
@@ -223,11 +228,22 @@ private struct MenuItemRow: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.leading, item.key.isEmpty ? 20 : 52)
+        .padding(.trailing, 20)
         .padding(.vertical, 2)
+        .background(isHovered && !item.key.isEmpty && selectionMode == .one
+            ? Color.accentColor.opacity(0.12) : Color.clear)
         .contentShape(Rectangle())
+        .onHover { hovered in
+            isHovered = hovered
+        }
         .onTapGesture {
-            if selectionMode != .none && !item.key.isEmpty { isSelected.toggle() }
+            guard selectionMode != .none && !item.key.isEmpty else { return }
+            if let onActivate {
+                onActivate()
+            } else {
+                isSelected.toggle()
+            }
         }
     }
 }
