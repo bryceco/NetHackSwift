@@ -21,6 +21,9 @@ struct MenuItemData: Identifiable {
     var text: String
 	var color: NSColor = .black
     var identifier: UInt = 0  // anything value (as uintptr_t) passed to addMenu / returned from selectMenu
+
+    /// True iff this item can be selected. Non-selectable items are headers or separators.
+    var isSelectable: Bool { identifier != 0 }
 }
 
 // MARK: - View
@@ -41,12 +44,13 @@ struct MenuWindowView: View {
     }
 
     private var allItems: [MenuItemData] { categories.flatMap { $0.items } }
+    private var selectableItems: [MenuItemData] { allItems.filter { $0.isSelectable } }
 
     private var displayCategories: [MenuCategory] {
         guard sortAlphabetically else { return categories }
         return categories.map { cat in
-            let keyed = cat.items.filter { !$0.key.isEmpty }.sorted { $0.text < $1.text }
-            let info  = cat.items.filter {  $0.key.isEmpty }
+            let keyed = cat.items.filter { $0.isSelectable }.sorted { $0.text < $1.text }
+            let info  = cat.items.filter { !$0.isSelectable }
             return MenuCategory(title: cat.title, items: keyed + info)
         }
     }
@@ -56,10 +60,10 @@ struct MenuWindowView: View {
     }
 
     private func toggleSelectAll() {
-        if selectedIDs.count == allItems.count {
+        if selectedIDs.count == selectableItems.count {
             selectedIDs = []
         } else {
-            selectedIDs = Set(allItems.map { $0.id })
+            selectedIDs = Set(selectableItems.map { $0.id })
         }
     }
 
@@ -198,8 +202,8 @@ private struct MenuItemRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if item.key.isEmpty {
-                // Informational row: no control or key slot; text aligns with items above.
+            if !item.isSelectable {
+                // Header or separator row: not selectable, no key slot.
                 Text(item.text)
                 Spacer()
             } else {
@@ -228,17 +232,17 @@ private struct MenuItemRow: View {
                 Spacer()
             }
         }
-        .padding(.leading, item.key.isEmpty ? 20 : 52)
+        .padding(.leading, item.isSelectable ? 52 : 20)
         .padding(.trailing, 20)
         .padding(.vertical, 2)
-        .background(isHovered && !item.key.isEmpty && selectionMode == .one
+        .background(isHovered && item.isSelectable && selectionMode == .one
             ? Color.accentColor.opacity(0.12) : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovered in
             isHovered = hovered
         }
         .onTapGesture {
-            guard selectionMode != .none && !item.key.isEmpty else { return }
+            guard selectionMode != .none && item.isSelectable else { return }
             if let onActivate {
                 onActivate()
             } else {
@@ -251,21 +255,18 @@ private struct MenuItemRow: View {
 // MARK: - Previews
 
 private let sampleCategories: [MenuCategory] = [
-    MenuCategory(title: "Weapons", items: [
-        MenuItemData(key: "a", text: "a +0 katana (weapon in hand)"),
-        MenuItemData(key: "c", text: "a +0 yumi"),
-        MenuItemData(key: "d", text: "44 +0 ya (in quiver)"),
-        MenuItemData(key: "f", text: "a +0 wakizashi (alternate weapon; not wielded)"),
-    ]),
-    MenuCategory(title: "Armor", items: [
-        MenuItemData(key: "e", text: "an uncursed rustproof +0 splint mail (being worn)"),
-    ]),
-    MenuCategory(title: "Comestibles", items: [
-        MenuItemData(key: "j", text: "a tin"),
-    ]),
-    MenuCategory(title: "Tools", items: [
-        MenuItemData(key: "b", text: "a bag containing 4 items"),
-        MenuItemData(key: "", text: "an item without a hotkey"),
+    MenuCategory(title: "Inventory", items: [
+        MenuItemData(key: "",  text: "Weapons",  identifier: 0),
+        MenuItemData(key: "a", text: "a +0 katana (weapon in hand)",                   identifier: 1),
+        MenuItemData(key: "c", text: "a +0 yumi",                                       identifier: 2),
+        MenuItemData(key: "d", text: "44 +0 ya (in quiver)",                            identifier: 3),
+        MenuItemData(key: "f", text: "a +0 wakizashi (alternate weapon; not wielded)",  identifier: 4),
+        MenuItemData(key: "",  text: "Armor",    identifier: 0),
+        MenuItemData(key: "e", text: "an uncursed rustproof +0 splint mail (being worn)", identifier: 5),
+        MenuItemData(key: "",  text: "Comestibles", identifier: 0),
+        MenuItemData(key: "j", text: "a tin",    identifier: 6),
+        MenuItemData(key: "",  text: "Tools",    identifier: 0),
+        MenuItemData(key: "b", text: "a bag containing 4 items", identifier: 7),
     ]),
 ]
 

@@ -696,14 +696,60 @@ extension NetHackController: NetHackBridgeDelegate {
 	{
 		let data = windowData[window]!
         let tileSet = TileSet.shared
-        let items = data.menuItems.map { item in
-            MenuItemData(
-                key: item.accel > 0 ? String(UnicodeScalar(UInt8(item.accel))) : "",
-                image: tileSet?.image(forGlyph: Int(item.glyph)),
-                text: item.string,
-				color: item.color.nsColor() ?? .black,
-                identifier: item.identifier
-            )
+        let rawItems = data.menuItems
+
+        // Collect accels already assigned by NetHack so auto-assignment skips them.
+        var usedAccels = Set<UInt8>(rawItems.compactMap { $0.accel > 0 ? UInt8($0.accel) : nil })
+        let accelPool: [UInt8] = Array(UInt8(ascii: "a")...UInt8(ascii: "z"))
+                                + Array(UInt8(ascii: "A")...UInt8(ascii: "Z"))
+        var accelPoolIndex = 0
+
+        var items: [MenuItemData] = []
+        items.reserveCapacity(rawItems.count)
+        for (idx, raw) in rawItems.enumerated() {
+            let selectable = raw.identifier != 0
+
+            // Determine accelerator: use the one NetHack supplied, or auto-assign a–z.
+            var accelStr = ""
+            if selectable {
+                if raw.accel > 0 {
+                    accelStr = String(UnicodeScalar(UInt8(raw.accel)))
+                } else {
+                    if let idx = accelPool[accelPoolIndex...].firstIndex(where: { !usedAccels.contains($0) }) {
+                        let c = accelPool[idx]
+                        accelPoolIndex = idx + 1
+                        usedAccels.insert(c)
+                        accelStr = String(UnicodeScalar(c))
+                    }
+                }
+            }
+
+            // For header items, look ahead at the items in their group.
+            // If every item in the group shares the same non-zero group accelerator,
+            // append that character to the header text so the user can see it at a glance.
+            var displayText = raw.string
+            if !selectable && !raw.string.isEmpty {
+                let groupStart = idx + 1
+                var groupEnd = groupStart
+                while groupEnd < rawItems.count && rawItems[groupEnd].identifier != 0 {
+                    groupEnd += 1
+                }
+                let groupSlice = rawItems[groupStart..<groupEnd]
+                if !groupSlice.isEmpty {
+                    let gacs = Set(groupSlice.map { $0.groupAccel })
+                    if gacs.count == 1, let gac = gacs.first, gac != 0 {
+                        displayText += "  [\(Character(UnicodeScalar(UInt8(gac))))]"
+                    }
+                }
+            }
+
+            items.append(MenuItemData(
+                key: accelStr,
+                image: tileSet?.image(forGlyph: Int(raw.glyph)),
+                text: displayText,
+                color: raw.color.nsColor() ?? .black,
+                identifier: raw.identifier
+            ))
         }
         let categories = [MenuCategory(title: data.menuTitle, items: items)]
         let nsWindow = NSWindow(
