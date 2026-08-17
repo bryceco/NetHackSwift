@@ -4,6 +4,27 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     var controller: NetHackController?
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // SwiftUI finishes building its menu bar synchronously before this point,
+        // but AppKit (NSFontManager) may append Format/View items on the same
+        // run-loop pass. Defer one cycle to ensure we run last.
+        DispatchQueue.main.async {
+            Self.removeUnwantedMenus()
+        }
+    }
+
+    private static func removeUnwantedMenus() {
+        guard let menu = NSApp.mainMenu else { return }
+        // NOTE: These titles are English-only. SwiftUI and AppKit don't expose a
+        // locale-independent handle for the Format (NSFontManager) and View menus,
+        // so title matching is the simplest reliable option for now.
+        for title in ["Format", "View"] {
+            if let item = menu.items.first(where: { $0.title == title }) {
+                menu.removeItem(item)
+            }
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let controller, controller.isInitialized else { return .terminateNow }
         controller.saveAndQuit()
@@ -57,7 +78,16 @@ struct NetHackSwiftApp: App {
 		}
 		FileManager.default.changeCurrentDirectoryPath(resourcesURL.path)
 		
-		TileSet.shared = TileSetDescriptor.default.load()
+		// Restore display mode from saved preferences.
+		let storedAsciiMode = UserDefaults.standard.bool(forKey: "mapUsesAsciiDisplay")
+		gameState.mapUsesAsciiDisplay = storedAsciiMode
+		if storedAsciiMode {
+			TileSet.shared = nil
+		} else {
+			let storedIdx = UserDefaults.standard.integer(forKey: "selectedTileSetIndex")
+			let clampedIdx = max(0, min(storedIdx, TileSetDescriptor.available.count - 1))
+			TileSet.shared = TileSetDescriptor.available[clampedIdx].load()
+		}
 
         let c = NetHackController()
         c.gameState = gameState
@@ -76,6 +106,10 @@ struct NetHackSwiftApp: App {
             } else {
                 EmptyView()
             }
+        }
+        .commands {
+            DefaultMenuRemovals()
+            GameCommands()
         }
     }
 }

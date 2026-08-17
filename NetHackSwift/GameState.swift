@@ -71,7 +71,7 @@ final class GameState {
     var clipAroundVersion: Int = 0
 
     // When true, MapView draws ttychar text instead of tile images.
-    var mapUsesTextDisplay: Bool = false
+    var mapUsesAsciiDisplay: Bool = false
 
     var hpDisplay: String { "\(hp)(\(maxHp))" }
     var pwDisplay: String { "\(pw)(\(maxPw))" }

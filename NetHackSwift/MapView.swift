@@ -15,7 +15,7 @@ struct MapView: View {
         let bkGlyphs  = gameState.mapBkGlyphs
         let cursor    = gameState.mapCursor
         let hpPercent = gameState.maxHp > 0 ? gameState.hp * 100 / gameState.maxHp : 100
-        let useText   = gameState.mapUsesTextDisplay
+        let useText   = gameState.mapUsesAsciiDisplay
 
         Canvas { context, size in
             if useText {
