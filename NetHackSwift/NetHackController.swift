@@ -258,34 +258,17 @@ extension NetHackController: NetHackBridgeDelegate {
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
             let hasTitle = !data.menuTitle.isEmpty
-			assert(blocking) // pretty sure there are always blocking, fix later if we're wrong
-            let panelClass: NSPanel.Type = blocking ? KeyablePanel.self : NSPanel.self
-            let panel = panelClass.init(
-                contentRect: NSRect(x: 0, y: 0, width: 259, height: 100),
-                styleMask: hasTitle ? [.titled, .closable, .resizable] : (blocking ? [.closable, .resizable] : [.closable, .resizable, .nonactivatingPanel]),
-                backing: .buffered,
-                defer: false
+			assert(blocking) // pretty sure these are always blocking; fix later if wrong
+            let panel = makeModalPanel(
+                styleMask: hasTitle ? [.titled, .closable, .resizable] : [.closable, .resizable],
+                title: hasTitle ? data.menuTitle : nil
             )
-            if hasTitle { panel.title = data.menuTitle }
-            panel.animationBehavior = .none
-            panel.isRestorable = false
-            panel.isReleasedWhenClosed = false
-            panel.isMovableByWindowBackground = true
             nhWindows[window] = panel
             let view = MessageWindowView(text: text) { NSApp.stopModal() }
-            let hc = NSHostingController(rootView: view)
-            hc.sizingOptions = .preferredContentSize
-            panel.contentViewController = hc
-            panel.contentMinSize = CGSize(width: 259, height: 100)
-            if blocking {
-                isShowingMessageModal = true
-                NSApp.runModal(for: panel)
-                isShowingMessageModal = false
-                panel.close()
-                nhWindows.removeValue(forKey: window)
-            } else {
-                panel.orderFront(nil)
-            }
+            isShowingMessageModal = true
+            runModal(panel, view: view, minSize: CGSize(width: 259, height: 100))
+            isShowingMessageModal = false
+            nhWindows.removeValue(forKey: window)
         case .menu:
             // Non-blocking: do nothing here — selectMenu will create the window.
             // Blocking: show display-only and wait for dismiss.
@@ -436,17 +419,8 @@ extension NetHackController: NetHackBridgeDelegate {
         let genders = genderNames.map { PlayerOption(name: $0) }
         let aligns  = alignNames.map  { PlayerOption(name: $0) }
 
-        let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 456, height: 100),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        panel.title = "Character Selection"
-        panel.animationBehavior = .none
-        panel.isRestorable = false
-        panel.isReleasedWhenClosed = false
-        panel.isMovableByWindowBackground = true
+        let panel = makeModalPanel(styleMask: [.titled],
+								   title: "Character Selection")
 
         var playerSelection: PlayerSelection? = nil
         let view = PlayerSelectionView(
@@ -464,12 +438,7 @@ extension NetHackController: NetHackBridgeDelegate {
                 NSApp.terminate(nil)
             }
         )
-
-        let hc = NSHostingController(rootView: view)
-        hc.sizingOptions = .preferredContentSize
-        panel.contentViewController = hc
-        NSApp.runModal(for: panel)
-        panel.close()
+        runModal(panel, view: view)
 
         guard let sel = playerSelection else { return nil }
 
@@ -580,15 +549,8 @@ extension NetHackController: NetHackBridgeDelegate {
             let cancelValue: Int32 = responses.contains("q") ? Int32(UInt8(ascii: "q")) : 0
             var styleMask: NSWindow.StyleMask = [.titled, .utilityWindow]
             if cancelValue != 0 { styleMask.insert(.closable) }
-            let panel = KeyablePanel(
-                contentRect: NSRect(x: 0, y: 0, width: 400, height: 115),
-                styleMask: styleMask,
-                backing: .buffered,
-                defer: false
-            )
-            panel.animationBehavior = .none
-            panel.isRestorable = false
-            panel.isReleasedWhenClosed = false
+			let panel = makeModalPanel(styleMask: styleMask,
+									   title: nil)
             var result: Int32 = cancelValue
             let view = YesNoWindowView(
                 question: displayQuestion,
@@ -600,10 +562,7 @@ extension NetHackController: NetHackBridgeDelegate {
                     NSApp.stopModal()
                 }
             )
-            let hc = NSHostingController(rootView: view)
-            panel.contentViewController = hc
-            NSApp.runModal(for: panel)
-            panel.close()
+            runModal(panel, view: view)
             completion(result)
             return
         }
@@ -630,32 +589,16 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     private func showDirectionModal(completion: @escaping (Int32) -> Void) {
-        let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+        let panel = makeModalPanel(
             styleMask: [.titled, .closable, .utilityWindow],
-            backing: .buffered,
-            defer: false
+            title: "Which direction?"
         )
-        panel.title = "Which direction?"
-        panel.animationBehavior = .none
-        panel.isRestorable = false
-        panel.isReleasedWhenClosed = false
         var result = asciiESC
         let view = DirectionModalView { key in
             result = key
             NSApp.stopModal()
         }
-        let hostingView = NSHostingView(rootView: view)
-        panel.setContentSize(hostingView.fittingSize)
-        panel.contentView = hostingView
-
-        // Pre-measure the size to avoid a preferredContentSize resize loop with Grid.
-        let contentSize = NSHostingView(rootView: view).fittingSize
-        let hc = NSHostingController(rootView: view)
-        panel.setContentSize(contentSize)
-        panel.contentViewController = hc
-        NSApp.runModal(for: panel)
-        panel.close()
+        runModal(panel, view: view)
         completion(result)
     }
 
@@ -685,6 +628,50 @@ extension NetHackController: NetHackBridgeDelegate {
 							completion(nil)
 						}
         )
+    }
+
+    // MARK: Modal Helpers
+
+    /// Creates a `KeyablePanel` with the standard boilerplate applied to all NetHack modal windows.
+    private func makeModalPanel(
+        styleMask: NSWindow.StyleMask,
+        title: String?
+    ) -> KeyablePanel {
+        let panel = KeyablePanel(
+            contentRect: .zero,
+            styleMask: styleMask,
+            backing: .buffered,
+            defer: false
+        )
+        if let title { panel.title = title }
+        panel.animationBehavior = .none
+        panel.isRestorable = false
+        panel.isReleasedWhenClosed = false
+        panel.isMovableByWindowBackground = true
+        return panel
+    }
+
+    /// Installs `view` as the panel's content, sizes it to fit (clamped by `maxHeightFraction`
+    /// of the visible screen height, floored by `minSize`), centers the panel, runs it modally,
+    /// then closes it before returning.
+    private func runModal<V: View>(
+        _ panel: NSWindow,
+        view: V,
+        minSize: CGSize = .zero,
+        maxHeightFraction: CGFloat = 1.0
+    ) {
+        let hc = NSHostingController(rootView: view)
+        panel.contentViewController = hc
+        if minSize != .zero { panel.contentMinSize = minSize }
+        let fitting = hc.view.fittingSize
+        let maxH = (NSScreen.main?.visibleFrame.height ?? 800) * maxHeightFraction
+        panel.setContentSize(CGSize(
+            width:  max(fitting.width,  minSize.width),
+            height: max(min(fitting.height, maxH), minSize.height)
+        ))
+        panel.center()
+        NSApp.runModal(for: panel)
+        panel.close()
     }
 
     /// Creates and presents a menu window modally. `onAccept`/`onCancel` are called after dismiss.
@@ -752,18 +739,13 @@ extension NetHackController: NetHackBridgeDelegate {
             ))
         }
         let categories = [MenuCategory(title: data.menuTitle, items: items)]
-        let nsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 250, height: 100),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        nsWindow.titleVisibility = .hidden
-        nsWindow.animationBehavior = .none
-        nsWindow.isRestorable = false
-        nsWindow.isReleasedWhenClosed = false
-        nhWindows[window] = nsWindow
-        // Use a local to capture what the user did; actual callbacks fire after runModal returns.
+        // Note: fittingSize is used (via runModal) rather than sizingOptions = .preferredContentSize
+        // because preferredContentSize triggers a setNeedsUpdateConstraints re-entrancy crash
+        // inside the modal run loop when used with this view.
+		let panel = makeModalPanel(styleMask: [.titled, .closable, .resizable],
+								   title: nil)
+        panel.titleVisibility = .hidden
+        nhWindows[window] = panel
         var accepted: [MenuItemData]? = nil
         let view = MenuWindowView(
             categories: categories,
@@ -771,22 +753,9 @@ extension NetHackController: NetHackBridgeDelegate {
             onAccept: { selected in accepted = selected; NSApp.stopModal() },
             onCancel: { NSApp.stopModal() }
         )
-        let hc = NSHostingController(rootView: view)
-        nsWindow.contentViewController = hc
-        nsWindow.contentMinSize = CGSize(width: 300, height: 100)
-        // Use fittingSize for a one-shot measurement before runModal.
-        // preferredContentSize cannot be used: its getter calls setNeedsUpdateConstraints
-        // internally, which re-enters the constraint solver during the modal run loop
-        // and causes an infinite update cycle that crashes.
-        let fitting = hc.view.fittingSize
-        let maxH = (NSScreen.main?.visibleFrame.height ?? 800) * 0.7
-        nsWindow.setContentSize(CGSize(
-            width:  max(fitting.width, 300),
-            height: max(min(fitting.height, maxH), 100)
-        ))
-        nsWindow.center()
-        NSApp.runModal(for: nsWindow)
-        nsWindow.close()
+        runModal(panel, view: view,
+                 minSize: CGSize(width: 300, height: 100),
+                 maxHeightFraction: 0.7)
         if let accepted {
             onAccept?(accepted)
         } else {
