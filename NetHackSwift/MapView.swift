@@ -9,7 +9,7 @@ struct MapView: View {
 
     var body: some View {
         let tileSet   = TileSet.shared
-        let tileSize  = tileSet?.tileSize ?? CGSize(width: 16, height: 16)
+        let tileSize  = tileSet?.displaySize ?? CGSize(width: 32, height: 32)
         let _         = gameState.mapVersion
         let glyphs    = gameState.mapGlyphs
         let bkGlyphs  = gameState.mapBkGlyphs

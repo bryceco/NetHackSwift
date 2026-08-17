@@ -9,24 +9,34 @@ struct TileSetDescriptor {
     let name: String
     /// PNG filename (without extension) as it appears in the app bundle's Resources.
     let resourceName: String
-    /// Size of a single tile in the sprite sheet, in points.
+    /// Native size of a single tile in the sprite sheet, in pixels. Used for cropping.
     let tileSize: CGSize
+    /// Size at which each tile is rendered on screen. Defaults to tileSize.
+    let displaySize: CGSize
+
+    init(name: String, resourceName: String, tileSize: CGSize, displaySize: CGSize? = nil) {
+        self.name = name
+        self.resourceName = resourceName
+        self.tileSize = tileSize
+        self.displaySize = displaySize ?? tileSize
+    }
 
     /// Loads and returns a ready-to-use TileSet, or nil if the resource is missing.
     func load() -> TileSet? {
         guard let url   = Bundle.main.url(forResource: resourceName, withExtension: "png"),
               let image = NSImage(contentsOf: url)
         else { return nil }
-        return TileSet(image: image, tileSize: tileSize)
+        return TileSet(image: image, tileSize: tileSize, displaySize: displaySize)
     }
 
     // MARK: Catalog
 
     /// All tile sets that ship with the app, in the order they should appear in menus.
     static let available: [TileSetDescriptor] = [
-        TileSetDescriptor(name: "NetHack Default (16x16)",
+        TileSetDescriptor(name: "NetHack Default (32x32)",
                           resourceName: "nhtiles",
-                          tileSize: CGSize(width: 16, height: 16)),
+                          tileSize: CGSize(width: 16, height: 16),
+                          displaySize: CGSize(width: 32, height: 32)),
         TileSetDescriptor(name: "PixelHack (32x32)",
                           resourceName: "PixelHack500_32x32",
                           tileSize: CGSize(width: 32, height: 32)),
@@ -36,9 +46,7 @@ struct TileSetDescriptor {
     ]
 
 	static var `default`: TileSetDescriptor {
-		get {
-			return Self.available[1]
-		}
+		return Self.available[0]
 	}
 }
 
@@ -54,6 +62,7 @@ struct TileSetDescriptor {
 final class TileSet {
 	let image: NSImage
 	let tileSize: CGSize
+	let displaySize: CGSize
 	let rows: Int
 	let columns: Int
 
@@ -63,9 +72,10 @@ final class TileSet {
 	/// Lazily populated crop cache: tile index → CGImage sub-region.
 	private var cgImageCache: [Int: CGImage] = [:]
 
-	init(image: NSImage, tileSize: CGSize) {
+	init(image: NSImage, tileSize: CGSize, displaySize: CGSize? = nil) {
 		self.image = image
 		self.tileSize = tileSize
+		self.displaySize = displaySize ?? tileSize
 		guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
 			fatalError("TileSet: could not obtain CGImage from sprite sheet")
 		}
