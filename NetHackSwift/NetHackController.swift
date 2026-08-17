@@ -528,19 +528,6 @@ extension NetHackController: NetHackBridgeDelegate {
             return
         }
 
-		#if false
-		// this function is really broken, and I'm not sure we even use it
-        let (items, specials) = YesNoWindowView.parseYnChoices(responses)
-		#endif
-
-		#if false
-        // Multi-item list with '?' option: let NetHack show its own comprehensive list.
-        if specials.contains("?") && items.count > 1 {
-            completion(Int32(UInt8(ascii: "?")))
-            return
-        }
-		#endif
-
         // Well-known answer sets (yn, ynq, lr) get a modal button panel.
         if let buttons = YesNoWindowView.makeButtons(from: responses) {
             // Strip the embedded "[y/n/…]" hint — the button labels make it redundant.
