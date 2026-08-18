@@ -80,6 +80,9 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyInputQueue: [Int32] = []
     // True while a blocking message/text modal is running.
     @ObservationIgnored private var isShowingMessageModal = false
+    // Non-blocking text panels shown for the user to read and dismiss themselves.
+    // Not tracked in nhWindows so destroyNhwindow doesn't close them prematurely.
+    @ObservationIgnored private var userDismissedPanels: Set<NSWindow> = []
 
     /// Set by the app before calling start(). Injected into any windows the bridge opens.
     var gameState: GameState?
@@ -258,17 +261,28 @@ extension NetHackController: NetHackBridgeDelegate {
         case .menu where data.menuItems.isEmpty, .text:
             let text = data.strings.joined(separator: "\n")
             let hasTitle = !data.menuTitle.isEmpty
-			assert(blocking) // pretty sure these are always blocking; fix later if wrong
             let panel = makeModalPanel(
                 styleMask: hasTitle ? [.titled, .closable, .resizable] : [.closable, .resizable],
                 title: hasTitle ? data.menuTitle : nil
             )
-            nhWindows[window] = panel
-            let view = MessageWindowView(text: text) { NSApp.stopModal() }
-            isShowingMessageModal = true
-            runModal(panel, view: view, minSize: CGSize(width: 259, height: 100))
-            isShowingMessageModal = false
-            nhWindows.removeValue(forKey: window)
+            if blocking {
+                nhWindows[window] = panel
+                let view = MessageWindowView(text: text) { NSApp.stopModal() }
+                isShowingMessageModal = true
+                runModal(panel, view: view, minSize: CGSize(width: 259, height: 100))
+                isShowingMessageModal = false
+                nhWindows.removeValue(forKey: window)
+            } else {
+                userDismissedPanels.insert(panel)
+                let view = MessageWindowView(text: text) { [weak self, weak panel] in
+                    panel?.close()
+                    if let panel { self?.userDismissedPanels.remove(panel) }
+                }
+                preparePanel(panel, view: view, minSize: CGSize(width: 259, height: 100))
+                // Don't store in nhWindows — destroyNhwindow must not close this panel
+                // before the user has had a chance to read it.
+                panel.makeKeyAndOrderFront(nil)
+            }
         case .menu:
             // Non-blocking: do nothing here — selectMenu will create the window.
             // Blocking: show display-only and wait for dismiss.
@@ -639,9 +653,8 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     /// Installs `view` as the panel's content, sizes it to fit (clamped by `maxHeightFraction`
-    /// of the visible screen height, floored by `minSize`), centers the panel, runs it modally,
-    /// then closes it before returning.
-    private func runModal<V: View>(
+    /// of the visible screen height, floored by `minSize`), and centers the panel.
+    private func preparePanel<V: View>(
         _ panel: NSWindow,
         view: V,
         minSize: CGSize = .zero,
@@ -657,6 +670,16 @@ extension NetHackController: NetHackBridgeDelegate {
             height: max(min(fitting.height, maxH), minSize.height)
         ))
         panel.center()
+    }
+
+    /// Installs `view`, sizes and centers the panel, runs it modally, then closes it.
+    private func runModal<V: View>(
+        _ panel: NSWindow,
+        view: V,
+        minSize: CGSize = .zero,
+        maxHeightFraction: CGFloat = 1.0
+    ) {
+        preparePanel(panel, view: view, minSize: minSize, maxHeightFraction: maxHeightFraction)
         NSApp.runModal(for: panel)
         panel.close()
     }
@@ -683,7 +706,7 @@ extension NetHackController: NetHackBridgeDelegate {
         for (idx, raw) in rawItems.enumerated() {
             let selectable = raw.identifier != 0
 
-            // Determine accelerator: use the one NetHack supplied, or auto-assign a–z.
+            // Determine accelerator: use the one NetHack supplied, or auto-assign a–zA-Z.
             var accelStr = ""
             if selectable {
                 if raw.accel > 0 {
