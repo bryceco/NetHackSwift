@@ -507,7 +507,23 @@ extension NetHackController: NetHackBridgeDelegate {
     // MARK: Blocking input
 
     func needLineInput(_ prompt: String, completion: @escaping (String?) -> Void) {
-        pendingLineCompletion = completion
+        let panel = makeModalPanel(
+            styleMask: [.titled, .closable, .resizable, .utilityWindow],
+            title: nil
+        )
+        var result: String? = nil
+        let view = InputWindowView(
+            prompt: prompt,
+            onAccept: { text in
+                result = text
+                NSApp.stopModal()
+            },
+            onCancel: {
+                NSApp.stopModal()
+            }
+        )
+        runModal(panel, view: view, minSize: CGSize(width: 363, height: 115))
+        completion(result)
     }
 
     func needKeyInput(_ completion: @escaping (Int32) -> Void) {
