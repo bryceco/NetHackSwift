@@ -117,18 +117,31 @@ final class KeyboardHandler {
 
     /// Translates a non-arrow key-down NSEvent into the NetHack character code.
     /// Arrow keys are handled separately via chord detection and never reach here.
-    /// The system-provided character already encodes modifiers (Ctrl+C → 3, etc.).
-    /// When macOS intercepts a Ctrl combo before we see it, compute it directly.
     static func keyCode(from event: NSEvent) -> Int32 {
-        let flags = event.modifierFlags
-        if let scalar = event.characters?.unicodeScalars.first, scalar.value > 0, scalar.value < 128 {
-            return Int32(scalar.value)
-        }
-        if flags.contains(.control),
-           let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
-           scalar.value >= 64, scalar.value < 128
-        {
-            return Int32(scalar.value) & 0x1F
+        let flags = event.modifierFlags.intersection([.control, .option])
+        switch flags {
+        case .control:
+            // macOS may intercept some Ctrl combos before characters is populated,
+            // so read the base character and compute the control code directly.
+            if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
+               scalar.value >= 64, scalar.value < 128
+			{
+                return Int32(scalar.value) & 0x1F
+            }
+        case .option:
+            // Meta is represented as the base character with the high bit set.
+            if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
+               scalar.value > 0, scalar.value < 128
+			{
+                return Int32(scalar.value | 0x80)
+            }
+        default:
+            // Plain key: macOS encodes shift into characters already (e.g. 'A' for Shift-A).
+            if let scalar = event.characters?.unicodeScalars.first,
+               scalar.value > 0, scalar.value < 128
+			{
+                return Int32(scalar.value)
+            }
         }
         return 0
     }

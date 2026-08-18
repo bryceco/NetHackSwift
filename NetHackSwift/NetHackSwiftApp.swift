@@ -109,7 +109,7 @@ struct NetHackSwiftApp: App {
         }
         .commands {
             DefaultMenuRemovals()
-            GameCommands()
+            GameCommands(controller: controller)
         }
     }
 }
