@@ -22,7 +22,7 @@ struct DefaultMenuRemovals: Commands {
 struct GameCommands: Commands {
     let controller: NetHackController?
     @AppStorage("mapUsesAsciiDisplay") private var mapUsesAsciiDisplay = false
-    @AppStorage("selectedTileSetIndex") private var selectedTileSetIndex = 0
+    @AppStorage("selectedTileSetName") private var selectedTileSetName = TileSetDescriptor.default.resourceName
 
     var body: some Commands {
         gameMenu
@@ -52,6 +52,7 @@ struct GameCommands: Commands {
 
             Button("Options")             { send(Int32(UInt8(ascii: "O"))) }.keyboardShortcut("o", modifiers: .shift)
             Button("Toggle Auto Pickup")  { send(Int32(UInt8(ascii: "@"))) }.keyboardShortcut("@", modifiers: [])
+            Button("Edit .nethackrc\u{2026}") { controller?.editNethackrc() }
 
             Divider()
 
@@ -61,11 +62,11 @@ struct GameCommands: Commands {
             ))
 
             Menu("Tile Set") {
-                ForEach(TileSetDescriptor.available.indices, id: \.self) { idx in
-                    Toggle(TileSetDescriptor.available[idx].name,
+                ForEach(TileSetDescriptor.available, id: \.resourceName) { desc in
+                    Toggle(desc.name,
                            isOn: Binding(
-                               get: { !mapUsesAsciiDisplay && selectedTileSetIndex == idx },
-                               set: { if $0 { selectTileSet(idx) } }
+                               get: { !mapUsesAsciiDisplay && selectedTileSetName == desc.resourceName },
+                               set: { if $0 { selectTileSet(desc.resourceName) } }
                            ))
                 }
             }
@@ -273,11 +274,11 @@ struct GameCommands: Commands {
         (NSApp.delegate as? AppDelegate)?.controller?.gameState?.mapUsesAsciiDisplay = enabled
     }
 
-    private func selectTileSet(_ index: Int) {
+    private func selectTileSet(_ resourceName: String) {
         mapUsesAsciiDisplay = false
-        selectedTileSetIndex = index
-        let desc = TileSetDescriptor.available[index]
-        TileSet.shared = desc.load()
+        selectedTileSetName = resourceName
+        let desc = TileSetDescriptor.available.first(where: { $0.resourceName == resourceName })
+        TileSet.shared = desc?.load()
         (NSApp.delegate as? AppDelegate)?.controller?.gameState?.mapVersion += 1
     }
 }

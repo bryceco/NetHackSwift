@@ -1,71 +1,68 @@
 import AppKit
+import SwiftUI
 
-/// Owns the global key-down/key-up event monitor and translates NSEvents into
-/// NetHack character codes, including diagonal arrow-key chord detection.
+/// Translates NSEvents into NetHack character codes, including diagonal
+/// arrow-key chord detection.  Wire up the two callbacks; the handler does the rest.
 ///
-/// Wire up the three callbacks and call `resetDirectionState()` at the start
-/// of each blocking input request; the handler does the rest.
+/// Key events are delivered via `handleKeyDown` / `handleKeyUp`, which are called
+/// from `GameKeyView` — a window-scoped NSView first responder.  Unlike a global
+/// event monitor, this approach only receives events while the game window is key,
+/// so modals and other panels naturally stop delivery without any extra guard code.
 final class KeyboardHandler {
-    /// Called when a key should be forwarded to NetHack.
+    /// Called when a translated key should be forwarded to NetHack.
     var onKey: ((Int32) -> Void)?
     /// Returns true when NetHack is currently blocking for key input.
     var isWaitingForInput: (() -> Bool)?
 
-    private var keyEventMonitor: Any?
     private var pressedDirectionKeys: Set<Int> = []
     private var pendingDirectionKeys: Set<Int> = []
-
-    init() {
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
-            guard let self, self.isWaitingForInput?() == true else { return event }
-
-            let keyCode = Int(event.keyCode)
-            let isArrow = Self.arrowKeyCodes.contains(keyCode)
-
-            if event.type == .keyDown {
-                // Let Command-key shortcuts (Cmd-Q, Cmd-H, Cmd-W, …) reach the app menu.
-                if event.modifierFlags.contains(.command) { return event }
-
-                if let mapping = Self.numpadKeyMap[keyCode] {
-                    // Numpad keys encode a single direction each — fire immediately.
-                    let shift = event.modifierFlags.contains(.shift)
-                    self.onKey?(Int32(shift ? mapping.shifted : mapping.plain))
-                } else if isArrow {
-                    // Accumulate arrow keys; resolve the chord on key-up.
-                    self.pressedDirectionKeys.insert(keyCode)
-                    self.pendingDirectionKeys.insert(keyCode)
-                } else {
-                    self.onKey?(Self.keyCode(from: event))
-                }
-                return nil  // consume
-
-            } else {  // .keyUp
-                if isArrow {
-                    if self.pendingDirectionKeys.contains(keyCode) {
-                        // First key-up of this chord — resolve and send.
-                        let shift = event.modifierFlags.contains(.shift)
-                        let ch = Self.chordCharacter(keys: self.pendingDirectionKeys, shift: shift)
-                        self.pendingDirectionKeys.removeAll()
-                        self.onKey?(ch)
-                    }
-                    self.pressedDirectionKeys.remove(keyCode)
-                }
-                return nil
-            }
-        }
-    }
-
-    deinit {
-        if let monitor = keyEventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
 
     /// Clears accumulated arrow-key state. Call at the start of each new blocking
     /// input request so stale state cannot corrupt the next chord.
     func resetChordState() {
         pressedDirectionKeys.removeAll()
         pendingDirectionKeys.removeAll()
+    }
+
+    // MARK: - Event handling (called by GameKeyView)
+
+    /// Processes a keyDown event.  Returns true if the event was consumed.
+    @discardableResult
+    func handleKeyDown(_ event: NSEvent) -> Bool {
+        guard isWaitingForInput?() == true else { return false }
+
+        // Let Command-key shortcuts (Cmd-Q, Cmd-H, …) reach the app menu.
+        if event.modifierFlags.contains(.command) { return false }
+
+        let keyCode = Int(event.keyCode)
+        if let mapping = Self.numpadKeyMap[keyCode] {
+            let shift = event.modifierFlags.contains(.shift)
+            onKey?(Int32(shift ? mapping.shifted : mapping.plain))
+        } else if Self.arrowKeyCodes.contains(keyCode) {
+            pressedDirectionKeys.insert(keyCode)
+            pendingDirectionKeys.insert(keyCode)
+        } else {
+            onKey?(Self.keyCode(from: event))
+        }
+        return true
+    }
+
+    /// Processes a keyUp event.  Returns true if the event was consumed.
+    @discardableResult
+    func handleKeyUp(_ event: NSEvent) -> Bool {
+        guard isWaitingForInput?() == true else { return false }
+
+        let keyCode = Int(event.keyCode)
+        if Self.arrowKeyCodes.contains(keyCode) {
+            if pendingDirectionKeys.contains(keyCode) {
+                let shift = event.modifierFlags.contains(.shift)
+                let ch = Self.chordCharacter(keys: pendingDirectionKeys, shift: shift)
+                pendingDirectionKeys.removeAll()
+                onKey?(ch)
+            }
+            pressedDirectionKeys.remove(keyCode)
+        }
+        return true  // consume all keyUp events while waiting for input
     }
 
     // MARK: - Key translation
@@ -125,24 +122,93 @@ final class KeyboardHandler {
             // so read the base character and compute the control code directly.
             if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
                scalar.value >= 64, scalar.value < 128
-			{
+            {
                 return Int32(scalar.value) & 0x1F
             }
         case .option:
             // Meta is represented as the base character with the high bit set.
             if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
                scalar.value > 0, scalar.value < 128
-			{
+            {
                 return Int32(scalar.value | 0x80)
             }
         default:
             // Plain key: macOS encodes shift into characters already (e.g. 'A' for Shift-A).
             if let scalar = event.characters?.unicodeScalars.first,
                scalar.value > 0, scalar.value < 128
-			{
+            {
                 return Int32(scalar.value)
             }
         }
         return 0
     }
+}
+
+// MARK: - GameKeyView
+
+/// A zero-visible-size NSView that maintains first-responder status in the game
+/// window and forwards key events to the KeyboardHandler.
+///
+/// Because events arrive through the responder chain (not a global monitor), key
+/// delivery is automatically scoped to the game window.  When a modal panel becomes
+/// key (e.g. a NetHack popup or the .nethackrc editor) this view is no longer first
+/// responder and does not intercept those events.
+final class GameKeyView: NSView {
+    var keyboardHandler: KeyboardHandler?
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        window.makeFirstResponder(self)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey),
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    @objc private func windowDidBecomeKey() {
+        // Reclaim first responder whenever the game window regains key status
+        // (e.g. after a modal panel closes).
+        window?.makeFirstResponder(self)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if keyboardHandler?.handleKeyDown(event) != true {
+            // Command keys must propagate so app-menu shortcuts keep working.
+            super.keyDown(with: event)
+        }
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if keyboardHandler?.handleKeyUp(event) != true {
+            super.keyUp(with: event)
+        }
+    }
+}
+
+/// Embeds `GameKeyView` in the SwiftUI hierarchy.  Place this once (typically as a
+/// `.background` of the main game view) so the game window captures key events.
+struct GameKeyViewRepresentable: NSViewRepresentable {
+    let handler: KeyboardHandler
+
+    func makeNSView(context: Context) -> GameKeyView {
+        let view = GameKeyView()
+        view.keyboardHandler = handler
+        return view
+    }
+
+    func updateNSView(_ nsView: GameKeyView, context: Context) {}
 }

@@ -19,6 +19,7 @@ struct MainWindowView: View {
                 MapContainerView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .background(controller.keyInputView)
             .frame(minWidth: 637, maxWidth: .infinity, minHeight: 376, maxHeight: .infinity)
         } else {
             ProgressView()

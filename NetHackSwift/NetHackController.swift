@@ -75,11 +75,9 @@ private struct NHMenuItem {
     @ObservationIgnored private var pendingKeyOrMouseCompletion: ((Int32, Int32, Int32, Int32) -> Void)?
     @ObservationIgnored private var pendingLineCompletion: ((String?) -> Void)?
     @ObservationIgnored private let keyboard = KeyboardHandler()
-    // Keys pressed before NetHack has asked for input (e.g. during a message modal).
-    // Consumed in FIFO order by the next needKeyInput/needKeyOrMouseInput.
+    // Keys pressed before NetHack has asked for input (e.g. typed while a message
+    // modal was open). Consumed in FIFO order by needKeyInput/needKeyOrMouseInput.
     @ObservationIgnored private var pendingKeyInputQueue: [Int32] = []
-    // True while a blocking message/text modal is running.
-    @ObservationIgnored private var isShowingMessageModal = false
     // Non-blocking text panels shown for the user to read and dismiss themselves.
     // Not tracked in nhWindows so destroyNhwindow doesn't close them prematurely.
     @ObservationIgnored private var userDismissedPanels: Set<NSWindow> = []
@@ -97,27 +95,20 @@ private struct NHMenuItem {
     private let bridge: NetHackBridge?
     var isInitialized = false
 
+    /// A SwiftUI view that captures key events for the game window.
+    /// Embed it once (as a `.background`) in the main game view hierarchy.
+    var keyInputView: some View { GameKeyViewRepresentable(handler: keyboard) }
+
     override init() {
         let isPreview = getenv("XCODE_RUNNING_FOR_PREVIEWS") != nil
                      || (getenv("XCODE_RUNNING_FOR_PLAYGROUNDS").map { String(cString: $0) == "1" } ?? false)
         bridge = isPreview ? nil : NetHackBridge()
         super.init()
         keyboard.isWaitingForInput = { [weak self] in
-            self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil || self?.isShowingMessageModal == true
+            self?.pendingKeyCompletion != nil || self?.pendingKeyOrMouseCompletion != nil
         }
         keyboard.onKey = { [weak self] key in
-            guard let self else { return }
-            if self.isShowingMessageModal {
-                // ESC and Return close the modal without passing the key through.
-                // Any other key is queued for the next needKeyInput/needKeyOrMouseInput.
-                let asciiReturn: Int32 = 13
-                if key != asciiESC && key != asciiReturn {
-                    self.pendingKeyInputQueue.append(key)
-                }
-                NSApp.stopModal()
-            } else {
-                self.sendKey(key)
-            }
+            self?.sendKey(key)
         }
     }
 
@@ -267,10 +258,17 @@ extension NetHackController: NetHackBridgeDelegate {
             )
             if blocking {
                 nhWindows[window] = panel
-                let view = MessageWindowView(text: text) { NSApp.stopModal() }
-                isShowingMessageModal = true
+                let view = MessageWindowView(
+                    text: text,
+                    onClose: { NSApp.stopModal() },
+                    onAnyKey: { [weak self] key in
+                        // Queue the key so it is consumed by the next input request,
+                        // then close the modal (the user has "typed through" it).
+                        self?.pendingKeyInputQueue.append(key)
+                        NSApp.stopModal()
+                    }
+                )
                 runModal(panel, view: view, minSize: CGSize(width: 259, height: 100))
-                isShowingMessageModal = false
                 nhWindows.removeValue(forKey: window)
             } else {
                 userDismissedPanels.insert(panel)
@@ -645,6 +643,61 @@ extension NetHackController: NetHackBridgeDelegate {
 							completion(nil)
 						}
         )
+    }
+
+    // MARK: - Configuration
+
+    /// Opens a modal text editor for the NetHack configuration file (the .nethackrc equivalent).
+    /// Creates the file with starter content if it does not yet exist, then writes back the
+    /// edited text when the user accepts.  Cancel leaves the file unchanged.
+	func editNethackrc() {
+		let fileURL = Self.nethackrcURL
+		let fm = FileManager.default
+
+		do {
+			if !fm.fileExists(atPath: fileURL.path) {
+				try fm.createDirectory(at: fileURL.deletingLastPathComponent(),
+									   withIntermediateDirectories: true)
+				let defaultContent = """
+				# NetHack configuration file.
+				# Changes take effect the next time you start a new game.
+				#
+				# Example:
+				# OPTIONS=autopickup,color,time,showexp
+				
+				"""
+				try defaultContent.write(to: fileURL, atomically: false, encoding: .utf8)
+			}
+
+			let content = (try String(contentsOf: fileURL, encoding: .utf8))
+			let panel = makeModalPanel(styleMask: [.titled, .closable, .resizable],
+									   title: "NetHack Defaults")
+			var accepted = false
+			var editedContent = content
+			let view = NethackrcEditorView(
+				initialText: content,
+				onAccept: { text in
+					editedContent = text
+					accepted = true
+					NSApp.stopModal()
+				},
+				onCancel: {
+					NSApp.stopModal()
+				}
+			)
+			runModal(panel, view: view, minSize: CGSize(width: 500, height: 400))
+			if accepted {
+				try editedContent.write(to: fileURL, atomically: false, encoding: .utf8)
+			}
+		} catch {
+			let alert = NSAlert(error: error)
+			alert.runModal()
+		}
+	}
+
+    private static var nethackrcURL: URL {
+        FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Preferences/NetHack Defaults.txt")
     }
 
     // MARK: Modal Helpers

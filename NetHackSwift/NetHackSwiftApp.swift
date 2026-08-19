@@ -84,9 +84,9 @@ struct NetHackSwiftApp: App {
 		if storedAsciiMode {
 			TileSet.shared = nil
 		} else {
-			let storedIdx = UserDefaults.standard.integer(forKey: "selectedTileSetIndex")
-			let clampedIdx = max(0, min(storedIdx, TileSetDescriptor.available.count - 1))
-			TileSet.shared = TileSetDescriptor.available[clampedIdx].load()
+			let storedName = UserDefaults.standard.string(forKey: "selectedTileSetName") ?? TileSetDescriptor.default.resourceName
+			let desc = TileSetDescriptor.available.first(where: { $0.resourceName == storedName }) ?? TileSetDescriptor.default
+			TileSet.shared = desc.load()
 		}
 
         let c = NetHackController()
