@@ -696,7 +696,16 @@ extension NetHackController: NetHackBridgeDelegate {
         maxHeightFraction: CGFloat = 1.0
     ) {
         preparePanel(panel, view: view, minSize: minSize, maxHeightFraction: maxHeightFraction)
+        // If the user dismisses via the title-bar close button, stop the modal loop
+        // so runModal(for:) returns. The observer is removed before panel.close() to
+        // avoid a redundant stopModal() call on the normal accept/cancel path.
+        let closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: panel,
+            queue: .main
+        ) { _ in NSApp.stopModal() }
         NSApp.runModal(for: panel)
+        NotificationCenter.default.removeObserver(closeObserver)
         panel.close()
     }
 
@@ -751,13 +760,14 @@ extension NetHackController: NetHackBridgeDelegate {
                 if !groupSlice.isEmpty {
                     let gacs = Set(groupSlice.map { $0.groupAccel })
                     if gacs.count == 1, let gac = gacs.first, gac != 0 {
-                        displayText += "  [\(Character(UnicodeScalar(UInt8(gac))))]"
+                        displayText += "  \(Character(UnicodeScalar(UInt8(gac))))"
                     }
                 }
             }
 
             items.append(MenuItemData(
                 key: accelStr,
+                groupAccel: raw.groupAccel > 0 ? String(UnicodeScalar(UInt8(raw.groupAccel))) : "",
                 image: tileSet?.image(forGlyph: Int(raw.glyph)),
                 text: displayText,
                 color: raw.color.nsColor() ?? .black,

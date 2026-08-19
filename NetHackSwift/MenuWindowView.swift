@@ -17,6 +17,7 @@ struct MenuCategory: Identifiable {
 struct MenuItemData: Identifiable {
     var id = UUID()
     var key: String         // inventory letter, e.g. "a"
+    var groupAccel: String  // group accelerator letter, e.g. "A"; empty if none
     var image: NSImage?
     var text: String
 	var color: NSColor = .black
@@ -49,9 +50,21 @@ struct MenuWindowView: View {
     private var displayCategories: [MenuCategory] {
         guard sortAlphabetically else { return categories }
         return categories.map { cat in
-            let keyed = cat.items.filter { $0.isSelectable }.sorted { $0.text < $1.text }
-            let info  = cat.items.filter { !$0.isSelectable }
-            return MenuCategory(title: cat.title, items: keyed + info)
+            // Sort selectable items within each header-bounded group independently,
+            // keeping headers and group order intact.
+            var result: [MenuItemData] = []
+            var group:  [MenuItemData] = []
+            for item in cat.items {
+                if item.isSelectable {
+                    group.append(item)
+                } else {
+                    result += group.sorted { $0.text < $1.text }
+                    group = []
+                    result.append(item)
+                }
+            }
+            result += group.sorted { $0.text < $1.text }
+            return MenuCategory(title: cat.title, items: result)
         }
     }
 
@@ -123,6 +136,7 @@ struct MenuWindowView: View {
             .padding(.horizontal, 8)
             .padding(.top, 4)
             .padding(.bottom, -20)   // cancel the button style's intrinsic bottom inset
+            .zIndex(1)               // draw above the ScrollView so clicks aren't intercepted by it
 
             // ScrollView sizes to its content up to maxScrollHeight when SwiftUI
             // computes the ideal size for preferredContentSize. ViewThatFits was
@@ -140,7 +154,7 @@ struct MenuWindowView: View {
             HStack(spacing: 14) {
                 if selectionMode == .any {
                     Button("All", action: toggleSelectAll)
-                        .keyboardShortcut("a", modifiers: .command)
+                        .keyboardShortcut(".", modifiers: [])
                 }
                 Spacer()
                 switch selectionMode {
@@ -172,10 +186,36 @@ struct MenuWindowView: View {
         .focused($isFocused)
         .onAppear { isFocused = true }
         .onKeyPress { press in
+            // ESC always closes: for display-only windows it's an implicit accept,
+            // for selectable windows it cancels.
+            if press.key == .escape {
+                switch selectionMode {
+                case .none: onAccept([])
+                case .one, .any: onCancel()
+                }
+                return .handled
+            }
             guard selectionMode != .none,
-                  let char = press.characters.first,
-                  let item = allItems.first(where: { $0.key == String(char) })
+                  let char = press.characters.first
             else { return .ignored }
+            let keyStr = String(char)
+
+            // Group accelerator (any mode only): toggle all items that share the accelerator.
+            if selectionMode == .any {
+                let group = allItems.filter { $0.groupAccel == keyStr && $0.isSelectable }
+                if !group.isEmpty {
+                    let groupIDs = Set(group.map { $0.id })
+                    if groupIDs.isSubset(of: selectedIDs) {
+                        selectedIDs.subtract(groupIDs)
+                    } else {
+                        selectedIDs.formUnion(groupIDs)
+                    }
+                    return .handled
+                }
+            }
+
+            // Individual accelerator.
+            guard let item = allItems.first(where: { $0.key == keyStr }) else { return .ignored }
             if selectionMode == .one {
                 onAccept([item])
             } else {
@@ -214,6 +254,8 @@ private struct MenuItemRow: View {
                     Toggle("", isOn: $isSelected)
                         .toggleStyle(.checkbox)
                         .labelsHidden()
+                        .focusable(false)
+                        .focusEffectDisabled()
                 }
 
                 if let image = item.image {
@@ -256,17 +298,17 @@ private struct MenuItemRow: View {
 
 private let sampleCategories: [MenuCategory] = [
     MenuCategory(title: "Inventory", items: [
-        MenuItemData(key: "",  text: "Weapons",  identifier: 0),
-        MenuItemData(key: "a", text: "a +0 katana (weapon in hand)",                   identifier: 1),
-        MenuItemData(key: "c", text: "a +0 yumi",                                       identifier: 2),
-        MenuItemData(key: "d", text: "44 +0 ya (in quiver)",                            identifier: 3),
-        MenuItemData(key: "f", text: "a +0 wakizashi (alternate weapon; not wielded)",  identifier: 4),
-        MenuItemData(key: "",  text: "Armor",    identifier: 0),
-        MenuItemData(key: "e", text: "an uncursed rustproof +0 splint mail (being worn)", identifier: 5),
-        MenuItemData(key: "",  text: "Comestibles", identifier: 0),
-        MenuItemData(key: "j", text: "a tin",    identifier: 6),
-        MenuItemData(key: "",  text: "Tools",    identifier: 0),
-        MenuItemData(key: "b", text: "a bag containing 4 items", identifier: 7),
+        MenuItemData(key: "",  groupAccel: "",  text: "Weapons",  identifier: 0),
+        MenuItemData(key: "a", groupAccel: "W", text: "a +0 katana (weapon in hand)",                   identifier: 1),
+        MenuItemData(key: "c", groupAccel: "W", text: "a +0 yumi",                                       identifier: 2),
+        MenuItemData(key: "d", groupAccel: "W", text: "44 +0 ya (in quiver)",                            identifier: 3),
+        MenuItemData(key: "f", groupAccel: "W", text: "a +0 wakizashi (alternate weapon; not wielded)",  identifier: 4),
+        MenuItemData(key: "",  groupAccel: "",  text: "Armor",    identifier: 0),
+        MenuItemData(key: "e", groupAccel: "A", text: "an uncursed rustproof +0 splint mail (being worn)", identifier: 5),
+        MenuItemData(key: "",  groupAccel: "",  text: "Comestibles", identifier: 0),
+        MenuItemData(key: "j", groupAccel: "C", text: "a tin",    identifier: 6),
+        MenuItemData(key: "",  groupAccel: "",  text: "Tools",    identifier: 0),
+        MenuItemData(key: "b", groupAccel: "T", text: "a bag containing 4 items", identifier: 7),
     ]),
 ]
 
