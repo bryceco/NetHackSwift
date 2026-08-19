@@ -34,7 +34,7 @@ struct TileSetDescriptor {
     /// All tile sets that ship with the app, in the order they should appear in menus.
     static let available: [TileSetDescriptor] = [
         TileSetDescriptor(name: "NetHack Default (32x32)",
-                          resourceName: "nhtiles",
+                          resourceName: "nhtiles16x16",
                           tileSize: CGSize(width: 16, height: 16),
                           displaySize: CGSize(width: 32, height: 32)),
         TileSetDescriptor(name: "PixelHack (32x32)",

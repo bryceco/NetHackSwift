@@ -12,7 +12,7 @@
 		02B20D52302547EB00C01E3E /* libnh.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 02B20D51302547EB00C01E3E /* libnh.a */; };
 		02F5766330254F8800F06F02 /* NetHackSwiftLib in Frameworks */ = {isa = PBXBuildFile; productRef = 02F5766230254F8800F06F02 /* NetHackSwiftLib */; };
 		02F578A53026652400F06F02 /* Playground in Resources */ = {isa = PBXBuildFile; fileRef = 02F578A43026652400F06F02 /* Playground */; };
-		02F7FEFB302A8E090071CDB0 /* nhtiles.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FEFA302A8E090071CDB0 /* nhtiles.png */; };
+		02F7FEFB302A8E090071CDB0 /* nhtiles16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FEFA302A8E090071CDB0 /* nhtiles16x16.png */; };
 		02F7FF25302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */; };
 		02F7FF42302CF33C0071CDB0 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 02F7FF41302CF33C0071CDB0 /* libz.tbd */; };
 		02F7FF72302DA6150071CDB0 /* PixelHack500_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */; };
@@ -24,7 +24,7 @@
 		024A52CB302934C300BA79BE /* sysconf */ = {isa = PBXFileReference; lastKnownFileType = text; path = sysconf; sourceTree = "<group>"; };
 		02B20D51302547EB00C01E3E /* libnh.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libnh.a; path = ../NetHack/src/libnh.a; sourceTree = "<group>"; };
 		02F578A43026652400F06F02 /* Playground */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Playground; path = NetHackSwift/Playground; sourceTree = "<group>"; };
-		02F7FEFA302A8E090071CDB0 /* nhtiles.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = nhtiles.png; sourceTree = "<group>"; };
+		02F7FEFA302A8E090071CDB0 /* nhtiles16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = nhtiles16x16.png; sourceTree = "<group>"; };
 		02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Nevanda_5.0.0_32x32.png; sourceTree = "<group>"; };
 		02F7FF41302CF33C0071CDB0 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = PixelHack500_32x32.png; sourceTree = "<group>"; };
@@ -91,11 +91,11 @@
 		024A52C9302934BF00BA79BE /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				024A52CA302934C300BA79BE /* nhdat */,
-				024A52CB302934C300BA79BE /* sysconf */,
 				02F7FF24302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png */,
+				024A52CA302934C300BA79BE /* nhdat */,
+				02F7FEFA302A8E090071CDB0 /* nhtiles16x16.png */,
 				02F7FF71302DA6150071CDB0 /* PixelHack500_32x32.png */,
-				02F7FEFA302A8E090071CDB0 /* nhtiles.png */,
+				024A52CB302934C300BA79BE /* sysconf */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -180,7 +180,7 @@
 				02F7FF72302DA6150071CDB0 /* PixelHack500_32x32.png in Resources */,
 				02F7FF25302AC1100071CDB0 /* Nevanda_5.0.0_32x32.png in Resources */,
 				024A52CC302944F400BA79BE /* nhdat in Resources */,
-				02F7FEFB302A8E090071CDB0 /* nhtiles.png in Resources */,
+				02F7FEFB302A8E090071CDB0 /* nhtiles16x16.png in Resources */,
 				024A52CD302944F400BA79BE /* sysconf in Resources */,
 				02F578A53026652400F06F02 /* Playground in Resources */,
 			);
