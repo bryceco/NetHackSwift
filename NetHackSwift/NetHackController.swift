@@ -542,6 +542,11 @@ extension NetHackController: NetHackBridgeDelegate {
         pendingKeyOrMouseCompletion = completion
     }
 
+    func needExtCmd(completion: @escaping (Int32) -> Void) {
+        // Stub: cancel the extended command request.
+        completion(-1)
+    }
+
     func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
         // Auto-confirm specific questions without showing any UI.
         let alwaysYes = ["Really save?", "Overwrite the old file?"]
