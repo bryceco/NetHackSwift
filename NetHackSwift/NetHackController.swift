@@ -389,8 +389,18 @@ extension NetHackController: NetHackBridgeDelegate {
         case .levelDesc: state.dlvl          = text ?? ""
         case .exp:       state.xp            = intVal
         case .condition: state.statusEffects = statusEffectsString(from: condBits)
-        default: break  // score, cap, hd, hunger, weapon, armor, terrain, version,
-                        // flush, reset, characteristics
+        case .cap:       state.cap    = text ?? ""
+        case .hunger:    state.hunger = text ?? ""
+        case .score:     print("score: \(intVal)")
+        case .hd:        print("hd: \(intVal)")
+        case .weapon:    print("weapon: \(text ?? "")")
+        case .armor:     print("armor: \(text ?? "")")
+        case .terrain:   print("terrain: \(text ?? "")")
+        case .version:   print("version: \(text ?? "")")
+        case .flush:     print("flush")
+        case .reset:     print("reset")
+        case .characteristics: print("characteristics")
+        default: print("updateStatusField: unhandled fieldIndex=\(fieldIndex.rawValue) text=\(text ?? "") intVal=\(intVal)")
         }
     }
 

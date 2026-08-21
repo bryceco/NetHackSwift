@@ -36,6 +36,12 @@ final class GameState {
 
     // Status line shown in red (e.g. "Confused, Stunned")
     var statusEffects: String = ""
+    var hunger: String = ""
+    var cap: String = ""
+
+    var statusLine: String {
+        [statusEffects, cap, hunger].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
 
     // Scrolling message log
     var messages: [String] = []

@@ -59,7 +59,7 @@ struct StatsView: View {
             Divider()
 
             // Status effects (empty string → invisible but still takes space)
-            Text(gameState.statusEffects.isEmpty ? " " : gameState.statusEffects)
+            Text(gameState.statusLine.isEmpty ? " " : gameState.statusLine)
                 .bold()
                 .foregroundStyle(.red)
         }
