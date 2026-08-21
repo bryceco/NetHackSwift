@@ -1,3 +1,5 @@
+import AppKit
+import NetHackBridge
 import SwiftUI
 
 struct StatsView: View {
@@ -7,10 +9,10 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 3) {
             // Player name and role
             HStack(spacing: 20) {
-                Text(gameState.playerName).bold()
-                Text(gameState.alignRaceRole)
+                Text(gameState.playerName).bold().foregroundStyle(color(for: .title))
+                Text(gameState.alignRaceRole).foregroundStyle(color(for: .align))
             }
-            Text(gameState.dlvl)
+            Text(gameState.dlvl).foregroundStyle(color(for: .levelDesc))
 
             Divider()
 
@@ -18,21 +20,21 @@ struct StatsView: View {
             Grid(alignment: .leading, horizontalSpacing: 3, verticalSpacing: 5) {
                 GridRow {
                     Text("Hp:")
-                    Text(gameState.hpDisplay).bold()
+                    Text(gameState.hpDisplay).bold().foregroundStyle(color(for: .hp))
                     Meter(value: fraction(gameState.hp, of: gameState.maxHp))
                     Text("Level:")
-                    Text("\(gameState.level)").bold()
+                    Text("\(gameState.level)").bold().foregroundStyle(color(for: .xp))
                     Text("XP:")
-                    Text("\(gameState.xp)").bold()
+                    Text("\(gameState.xp)").bold().foregroundStyle(color(for: .exp))
                 }
                 GridRow {
                     Text("Pw:")
-                    Text(gameState.pwDisplay).bold()
+                    Text(gameState.pwDisplay).bold().foregroundStyle(color(for: .energy))
                     Meter(value: fraction(gameState.pw, of: gameState.maxPw))
                     Text("AC:")
-                    Text("\(gameState.ac)").bold()
+                    Text("\(gameState.ac)").bold().foregroundStyle(color(for: .ac))
                     Text("$:")
-                    Text("\(gameState.gold)").bold()
+                    Text("\(gameState.gold)").bold().foregroundStyle(color(for: .gold))
                 }
             }
 
@@ -41,15 +43,15 @@ struct StatsView: View {
             // Attributes
             Grid(alignment: .leading, horizontalSpacing: 3, verticalSpacing: 5) {
                 GridRow {
-                    Text("Str:"); Text(gameState.str).bold()
-                    Text("Dex:"); Text("\(gameState.dex)").bold()
-                    Text("Con:"); Text("\(gameState.con)").bold()
-                    Text("Turn:"); Text("\(gameState.turn)").bold()
+                    Text("Str:"); Text(gameState.str).bold().foregroundStyle(color(for: .str))
+                    Text("Dex:"); Text("\(gameState.dex)").bold().foregroundStyle(color(for: .dex))
+                    Text("Con:"); Text("\(gameState.con)").bold().foregroundStyle(color(for: .con))
+                    Text("Turn:"); Text("\(gameState.turn)").bold().foregroundStyle(color(for: .time))
                 }
                 GridRow {
-                    Text("Int:"); Text("\(gameState.int_)").bold()
-                    Text("Wis:"); Text("\(gameState.wis)").bold()
-                    Text("Cha:"); Text("\(gameState.cha)").bold()
+                    Text("Int:"); Text("\(gameState.int_)").bold().foregroundStyle(color(for: .int))
+                    Text("Wis:"); Text("\(gameState.wis)").bold().foregroundStyle(color(for: .wis))
+                    Text("Cha:"); Text("\(gameState.cha)").bold().foregroundStyle(color(for: .cha))
                     // Pad to match row 1's column count
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
@@ -70,6 +72,11 @@ struct StatsView: View {
     private func fraction(_ value: Int, of maximum: Int) -> Double {
         guard maximum > 0 else { return 0 }
         return max(0, min(1, Double(value) / Double(maximum)))
+    }
+
+    private func color(for field: NHStatusField) -> Color {
+        guard let nsColor = gameState.statusColors[field]?.nsColor() else { return .primary }
+        return Color(nsColor: nsColor)
     }
 }
 

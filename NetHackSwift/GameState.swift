@@ -43,6 +43,10 @@ final class GameState {
         [statusEffects, cap, hunger].filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
+    // Per-field hilite colors from NetHack's hilite_status rules.
+    // NHColor.none means no override; the view uses its default color.
+    var statusColors: [NHStatusField: NHColor] = [:]
+
     // Scrolling message log
     var messages: [String] = []
 

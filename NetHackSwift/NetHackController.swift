@@ -397,11 +397,12 @@ extension NetHackController: NetHackBridgeDelegate {
         case .armor:     print("armor: \(text ?? "")")
         case .terrain:   print("terrain: \(text ?? "")")
         case .version:   print("version: \(text ?? "")")
-        case .flush:     print("flush")
-        case .reset:     print("reset")
+        case .flush:     break // flush changes
+        case .reset:     break // redisplay all fields
         case .characteristics: print("characteristics")
         default: print("updateStatusField: unhandled fieldIndex=\(fieldIndex.rawValue) text=\(text ?? "") intVal=\(intVal)")
         }
+        state.statusColors[fieldIndex] = color
     }
 
     // MARK: Misc output
