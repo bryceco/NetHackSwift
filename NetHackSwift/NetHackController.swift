@@ -361,7 +361,7 @@ extension NetHackController: NetHackBridgeDelegate {
         // nothing to do
     }
 
-    func update(_ fieldIndex: NHStatusField, text: String?, condBits: NHCondition, change: Int32, percent: Int32, color: NHColor, colorMasks: UnsafePointer<UInt>?) {
+    func updateStatus(field: NHStatusField, text: String?, condBits: NHCondition, change: Int32, percent: Int32, color: NHColor, colorMasks: UnsafePointer<UInt>?) {
         guard let state = gameState else { return }
         // Parse text as Int, skipping any leading non-numeric prefix (e.g. "$:" on gold).
         let intVal: Int = {
@@ -369,7 +369,7 @@ extension NetHackController: NetHackBridgeDelegate {
             let s = text.drop(while: { !$0.isNumber && $0 != "-" })
             return Int(s) ?? 0
         }()
-        switch fieldIndex {
+        switch field {
         case .title:     state.playerName    = text ?? ""
         case .str:       state.str           = text ?? ""               // may be "18/01"
         case .dex:       state.dex           = intVal
@@ -400,9 +400,9 @@ extension NetHackController: NetHackBridgeDelegate {
         case .flush:     break // flush changes
         case .reset:     break // redisplay all fields
         case .characteristics: print("characteristics")
-        default: print("updateStatusField: unhandled fieldIndex=\(fieldIndex.rawValue) text=\(text ?? "") intVal=\(intVal)")
+        default: print("updateStatusField: unhandled fieldIndex=\(field.rawValue) text=\(text ?? "") intVal=\(intVal)")
         }
-        state.statusColors[fieldIndex] = color
+        state.statusColors[field] = color
     }
 
     // MARK: Misc output
@@ -664,9 +664,14 @@ extension NetHackController: NetHackBridgeDelegate {
     }
 
     func selectMenu(in window: NHWindowID,
-					how: Int32,
+					how: NHPickMode,
                     completion: @escaping ([NHMenuSelection]?) -> Void) {
-        let selectionMode: MenuSelectionMode = how == 0 ? .none : how == 1 ? .one : .any
+        let selectionMode: MenuSelectionMode
+        switch how {
+        case .none: selectionMode = .none
+        case .one:  selectionMode = .one
+        default:    selectionMode = .any
+        }
         showMenuWindow(window: window,
 					   selectionMode: selectionMode,
 					   onAccept: { selected in
