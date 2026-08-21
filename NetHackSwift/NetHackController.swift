@@ -361,7 +361,7 @@ extension NetHackController: NetHackBridgeDelegate {
         // nothing to do
     }
 
-    func update(_ fieldIndex: NHStatusField, text: String?, condBits: Int, change: Int32, percent: Int32, color: NHColor, colorMasks: UnsafePointer<UInt>?) {
+    func update(_ fieldIndex: NHStatusField, text: String?, condBits: NHCondition, change: Int32, percent: Int32, color: NHColor, colorMasks: UnsafePointer<UInt>?) {
         guard let state = gameState else { return }
         // Parse text as Int, skipping any leading non-numeric prefix (e.g. "$:" on gold).
         let intVal: Int = {
@@ -926,33 +926,33 @@ private struct DirectionModalView: View {
 // MARK: - Status helpers
 
 /// Converts a BL_CONDITION bitmask into a human-readable comma-separated string.
-private func statusEffectsString(from condBits: Int) -> String {
-    // (mask, display name) — ordered by rough importance for display
-    let conditions: [(Int, String)] = [
-        (0x00000002, "Blind"),
-        (0x00000008, "Confused"),
-        (0x00000400, "Hallucinating"),
-        (0x00400000, "Stunned"),
-        (0x00008000, "Paralyzed"),
-        (0x08000000, "Unconscious"),
-        (0x00020000, "Sleeping"),
-        (0x00100000, "Stoning"),
-        (0x00200000, "Strangling"),
-        (0x00000080, "FoodPois"),
-        (0x00000010, "Deaf"),
-        (0x00040000, "Slimed"),
-        (0x00800000, "Submerged"),
-        (0x00002000, "InLava"),
-        (0x00004000, "Levitating"),
-        (0x00000040, "Flying"),
-        (0x00010000, "Riding"),
-        (0x10000000, "WoundedLegs"),
-        (0x04000000, "Trapped"),
-        (0x00000200, "Grabbed"),
-        (0x00000800, "Held"),
+private func statusEffectsString(from cond: NHCondition) -> String {
+    // (condition, display name) — ordered by rough importance for display
+    let conditions: [(NHCondition, String)] = [
+        (.blind,         "Blind"),
+        (.confused,      "Confused"),
+        (.hallucinating, "Hallucinating"),
+        (.stunned,       "Stunned"),
+        (.paralyzed,     "Paralyzed"),
+        (.unconscious,   "Unconscious"),
+        (.sleeping,      "Sleeping"),
+        (.stoning,       "Stoning"),
+        (.strangling,    "Strangling"),
+        (.foodPoisoned,  "FoodPois"),
+        (.deaf,          "Deaf"),
+        (.slimed,        "Slimed"),
+        (.submerged,     "Submerged"),
+        (.inLava,        "InLava"),
+        (.levitating,    "Levitating"),
+        (.flying,        "Flying"),
+        (.riding,        "Riding"),
+        (.woundedLegs,   "WoundedLegs"),
+        (.trapped,       "Trapped"),
+        (.grabbed,       "Grabbed"),
+        (.held,          "Held"),
     ]
     return conditions
-        .filter { condBits & $0.0 != 0 }
+        .filter { cond.contains($0.0) }
         .map(\.1)
         .joined(separator: ", ")
 }
