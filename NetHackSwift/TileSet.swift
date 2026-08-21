@@ -104,7 +104,8 @@ final class TileSet {
 	/// Crops from the sprite sheet on first access and caches the result.
 	func cgImage(forTile tile: Int) -> CGImage? {
 		if let cached = cgImageCache[tile] { return cached }
-		guard let cropped = cgSource.cropping(to: cgRect(forTile: tile)) else { return nil }
+		let rect = cgRect(forTile: tile)
+		guard let cropped = cgSource.cropping(to: rect) else { return nil }
 		cgImageCache[tile] = cropped
 		return cropped
 	}
@@ -123,6 +124,9 @@ final class TileSet {
 	func cgImage(forGlyph glyph: Int) -> CGImage? {
 		guard glyph >= 0 else { return nil }
 		let tile = NetHackBridge.tileIndex(forGlyph: glyph)
+		if tile < 0 {
+			return nil
+		}
 		return cgImage(forTile: tile)
 	}
 
