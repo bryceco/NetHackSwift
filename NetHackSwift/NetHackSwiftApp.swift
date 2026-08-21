@@ -26,10 +26,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let controller, controller.isInitialized else { return .terminateNow }
+        guard
+			let controller,
+			controller.isInitialized,
+			controller.nethackRunning
+		else {
+			return .terminateNow
+		}
         controller.saveAndQuit()
-        // NetHack calls exit() after saving, which terminates the process.
-        return .terminateLater
+		controller.nethackRunning = false
+        // The above call will tell nethack to exit, but we don't exit ourself until user confirms it
+		return .terminateCancel
     }
 }
 

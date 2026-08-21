@@ -94,6 +94,7 @@ private struct NHMenuItem {
 
     private let bridge: NetHackBridge?
     var isInitialized = false
+	var nethackRunning = true
 
     /// A SwiftUI view that captures key events for the game window.
     /// Embed it once (as a `.background`) in the main game view hierarchy.
