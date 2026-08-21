@@ -542,9 +542,26 @@ extension NetHackController: NetHackBridgeDelegate {
         pendingKeyOrMouseCompletion = completion
     }
 
-    func needExtCmd(completion: @escaping (Int32) -> Void) {
-        // Stub: cancel the extended command request.
-        completion(-1)
+    func needExtCmd(names: [String],
+                    descriptions: [String],
+                    keys: [NSNumber],
+                    completion: @escaping (Int32) -> Void)
+    {
+        let commands = names.indices.map { i in
+            ExtCmdEntry(id: i, name: names[i], description: descriptions[i], key: keys[i].uint8Value)
+        }
+        let panel = makeModalPanel(styleMask: [.titled, .closable, .resizable], title: nil)
+        panel.titleVisibility = .hidden
+        var result: Int32 = -1
+        let view = ExtCmdWindowView(
+            commands: commands,
+            onAccept: { index in result = Int32(index); NSApp.stopModal() },
+            onCancel: { NSApp.stopModal() }
+        )
+        runModal(panel, view: view,
+                 minSize: CGSize(width: 500, height: 200),
+                 maxHeightFraction: 0.8)
+        completion(result)
     }
 
     func needYnInput(_ query: String, responses: String, defaultResponse: Int32, completion: @escaping (Int32) -> Void) {
