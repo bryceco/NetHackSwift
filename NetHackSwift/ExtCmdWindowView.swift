@@ -13,7 +13,7 @@ struct ExtCmdEntry: Identifiable {
         if key == 0 { return "" }
         if key >= 128 { return "⌥\(Character(UnicodeScalar(key & 0x7f)))" }
 		if key < 32 { return "⌃\(Character(UnicodeScalar(key + 64)))" }
-		return String(UnicodeScalar(key + 64))
+		return String(UnicodeScalar(key))
     }
 }
 
@@ -151,18 +151,21 @@ struct ExtCmdWindowView: View {
         case .tab:
             moveSelection(by: press.modifiers.contains(.shift) ? -1 : 1)
             return .handled
-        case .delete, .deleteForward:
-            if !searchText.isEmpty {
-                searchText.removeLast()
-                updateAutocomplete()
-            }
-            return .handled
         default:
             break
         }
 
         // Printable ASCII → append to search buffer and autocomplete.
         let chars = press.characters
+        // The macOS Delete key (⌫) sends \u{7F} (DEL, 127). KeyEquivalent.delete is
+        // defined as \u{8} (BS, 8) and never matches, so we check characters directly.
+        if chars == "\u{7F}" {
+            if !searchText.isEmpty {
+                searchText.removeLast()
+                updateAutocomplete()
+            }
+            return .handled
+        }
         if !chars.isEmpty && chars.unicodeScalars.allSatisfy({ $0.value >= 32 && $0.value < 127 }) {
             searchText += chars
             updateAutocomplete()
