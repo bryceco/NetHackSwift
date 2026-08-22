@@ -92,9 +92,16 @@ private struct NHMenuItem {
     /// Kept to maintain a strong reference so the windows aren't deallocated.
     @ObservationIgnored private var nhWindows: [NHWindowID: NSWindow] = [:]
 
+	enum RunningState {
+		case nethackPreGame			// game thread alive, before map is first shown
+		case nethackGameRunning		// map has been shown; a real game is in progress
+		case nethackExitedAfterPlayerDied
+		case nethackExitingAfterUserRequestedSave
+	}
+
     private let bridge: NetHackBridge?
     var isInitialized = false
-	var nethackRunning = true
+	@ObservationIgnored var runningState: RunningState = .nethackPreGame
 
     /// A SwiftUI view that captures key events for the game window.
     /// Embed it once (as a `.background`) in the main game view hierarchy.
@@ -126,7 +133,7 @@ private struct NHMenuItem {
         })
     }
 
-    /// Send the save-and-quit command to NetHack. NetHack will save and call exit().
+    /// Send the save-and-quit command to NetHack. NetHack will save and call exit(), but we block the exit() call.
     func saveAndQuit() {
         sendKey(Int32(UInt8(ascii: "S")))
     }
@@ -466,6 +473,9 @@ extension NetHackController: NetHackBridgeDelegate {
 
         guard let sel = playerSelection else { return nil }
 
+        // Player committed to starting a game; from here deaths are real.
+        runningState = .nethackGameRunning
+
         let result = NHPlayerSelection()
         if let raceID = sel.raceID, let idx = races.firstIndex(where: { $0.id == raceID }) {
             result.raceIndex = idx
@@ -494,16 +504,35 @@ extension NetHackController: NetHackBridgeDelegate {
         // nothing to do
     }
 
+	// This is called by nethack just before it calls exit()
     func exitWindows(withMessage message: String?) {
-		guard let message else {
-			return
+        if let message {
+            if let messageWin = windowData.first(where: { (k,v) in v.type == .message })?.key {
+                putString(in: messageWin, string: message, attribute: .none)
+            } else {
+                rawPrint(message)
+            }
+        }
+
+		switch runningState {
+		case .nethackExitingAfterUserRequestedSave:
+			// The user asked nethack to save and exit.
+            // Give the user a moment to read the sign-off message before the app closes.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                NSApplication.shared.reply(toApplicationShouldTerminate: true)
+            }
+		case .nethackPreGame:
+            // NetHack quit during character selection
+            // Nothing to show; terminate immediately.
+            runningState = .nethackExitedAfterPlayerDied
+            NSApp.terminate(nil)
+        case .nethackGameRunning:
+            // Player was in a game — keep the app alive so they can read the death message.
+            runningState = .nethackExitedAfterPlayerDied
+		case .nethackExitedAfterPlayerDied:
+			// shouldn't get here because nethack calls this function, and it already exited
+			fatalError()
 		}
-		guard let messageWin = windowData.first(where: { (k,v) in v.type == .message })?.key else {
-			rawPrint(message)
-			return
-		}
-		self.putString(in: messageWin, string: message, attribute: .none)
-        print("exit_nhwindows: \(message)")
     }
 
     func suspendWindows(withMessage message: String?) {

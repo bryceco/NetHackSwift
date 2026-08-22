@@ -25,18 +25,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+	// Called when the user presses Cmd-Q or closes the window.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard
 			let controller,
-			controller.isInitialized,
-			controller.nethackRunning
+			controller.isInitialized
 		else {
 			return .terminateNow
 		}
-        controller.saveAndQuit()
-		controller.nethackRunning = false
-        // The above call will tell nethack to exit, but we don't exit ourself until user confirms it
-		return .terminateCancel
+
+		switch controller.runningState {
+		case .nethackPreGame:
+			// User quit during character selection
+			return .terminateNow
+		case .nethackGameRunning:
+			// User requested to quit.
+			// This will tell nethack to save, and we will not allow the quit until it finishes
+			controller.runningState = .nethackExitingAfterUserRequestedSave
+			controller.saveAndQuit()
+			// Don't exit until nethack has finished saving and calls exitWindows()
+			return .terminateLater
+		case .nethackExitingAfterUserRequestedSave:
+			// already waiting for nethack to finish saving
+			return .terminateLater
+		case .nethackExitedAfterPlayerDied:
+			// nethack terminated, and then user requested to quit
+			return .terminateNow
+		}
     }
 }
 
